@@ -26,7 +26,8 @@
                 "short", SHORT;
                 "long", LONG;
                 "unsigned", UNSIGNED;
-                "struct", STRUCT
+                "struct", STRUCT;
+                "extern", EXTERN;
               ]	;
               (fun s -> try  Hashtbl.find h s with Not_found -> IDENT s)
 
@@ -49,6 +50,7 @@ rule token = parse
   | "}"              { RB }
   | "("              { LP }
   | ")"              { RP }
+  | ","              { COMMA }
   | const_int        { NUM (Int32.of_string (lexeme lexbuf)) }
   | identifier       { keyword_or_ident(lexeme lexbuf) }
   | "/*"             { comment lexbuf }

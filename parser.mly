@@ -28,6 +28,7 @@
 
 %token EOF
 %token <string> IDENT
+%token <int32>  NUM
 
 %token VOID
 %token CHAR SHORT INT LONG
