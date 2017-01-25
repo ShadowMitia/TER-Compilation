@@ -74,6 +74,7 @@ decl:
     | STRUCT; i = IDENT; LB; l = list(terminated(decl_var, SEMI)); RB; SEMI  { Dstruct ((loc i), l) }
     | EXTERN; t = var_type; v = var; LP; l = separated_list(COMMA, decl_var); RP; SEMI { let t, i = unvar t v in Dfun(t, i, l, None) }
     | t=var_type; v=var; LP; l = separated_list(COMMA, decl_var); RP; b = block { let t, i = unvar t v in Dfun(t, i, l, None) }
+    | t=var_type; v=var; LP; l = separated_list(COMMA, decl_var); RP; SEMI { let t, i = unvar t v in Dfun(t, i, l, None) }
 ;
 
 block:
@@ -100,7 +101,6 @@ var:
 decl_var:
     | vt=var_type v = var{ unvar vt v }
 ;
-
 
 var_type:
   | s=signedness t=integer_type  { Tinteger(s, t) }

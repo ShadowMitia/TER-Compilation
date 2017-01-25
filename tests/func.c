@@ -1,6 +1,6 @@
 int f();
-int g() {
-
-int x;
-x;
+int g(int a);
+int h(char toto) {
+	int x;
+	x;
 }
