@@ -1,0 +1,10 @@
+*.cm[iox]
+*.cmt
+*.cmti
+*~
+.*~
+*.o
+parser.conflicts
+lexer.ml parser.ml parser.mli
+minic
+minic.opt
