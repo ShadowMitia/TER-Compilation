@@ -5,6 +5,8 @@
 .*~
 *.o
 parser.conflicts
-lexer.ml parser.ml parser.mli
+lexer.ml 
+parser.ml 
+parser.mli
 minic
 minic.opt
