@@ -17,19 +17,18 @@
 
   let char_error s = raise (Lexical_error ("illegal character sequence: " ^ s))
 
-  let keyword_or_ident =
-    let h = Hashtbl.create 17 in
-    List.iter (fun (s, k) -> Hashtbl.add h s k)
-              [ "int", INT;
-                "void", VOID;
-                "char", CHAR;
-                "short", SHORT;
-                "long", LONG;
-                "unsigned", UNSIGNED;
-                "struct", STRUCT;
-                "extern", EXTERN;
-              ]	;
-              (fun s -> try  Hashtbl.find h s with Not_found -> IDENT s)
+  let keyword_or_ident s =
+    try
+    List.assoc s [  "int", INT;
+                    "void", VOID;
+                    "char", CHAR;
+                    "short", SHORT;
+                    "long", LONG;
+                    "unsigned", UNSIGNED;
+                    "struct", STRUCT;
+                    "extern", EXTERN;
+                  ]	;
+    with Not_found -> IDENT s
 
 }
 
@@ -51,6 +50,19 @@ rule token = parse
   | "("              { LP }
   | ")"              { RP }
   | ","              { COMMA }
+  | "-"              { MINUS }
+  | "+"              { PLUS }
+  | "*"              { MULT }
+  | "/"              { DIV }
+  | "=="             { EQ }
+  | "!="             { NEQ }
+  | ">"              { GT }
+  | ">="             { GTE }
+  | "<"              { LT }
+  | "<="             { LTE }
+  | "%"              { MOD }
+  | "&&"             { AND }
+  | "||"             { OR }
   | const_int        { NUM (Int32.of_string (lexeme lexbuf)) }
   | identifier       { keyword_or_ident(lexeme lexbuf) }
   | "/*"             { comment lexbuf }

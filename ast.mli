@@ -1,6 +1,6 @@
 (* Arbres de syntaxe abstraite *)
 
-type ('info, 'node) node = { loc : 'info;
+type ('info, 'node) node = { info : 'info;
 			     node : 'node }
 
 type loc = Lexing.position * Lexing.position
@@ -24,7 +24,11 @@ type constant =
   | Cdouble of float
   | Cstring of string
 
-type binop = Add
+type binop = Add | Mult | Minus | Div | Mod
+					 | And | Or
+					 | Eq  | Neq  | Lt    | Le  | Gt  | Ge
+type unop = Neg | Deref | Pos
+
 type 'info expr = ('info, 'info expr_node) node
 and 'info expr_node =
   | Enull (* Inséré automatiquement à partir de 0 *)
@@ -32,6 +36,7 @@ and 'info expr_node =
   | Eident of ident
   | Esizeof of c_type
   | Ebinop of 'info expr * binop * 'info expr
+	| Eunop of  unop * 'info expr
   (* à compléter *)
 
 type var_decl =  c_type * ident

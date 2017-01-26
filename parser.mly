@@ -4,16 +4,7 @@
   open Ast
 
 
-  let mk_loc e l = { loc = l; node = e }
-
-  let loc e =
-    mk_loc e (Parsing.symbol_start_pos (),Parsing.symbol_end_pos())
-
-  let loc_i i e =
-    mk_loc e (Parsing.rhs_start_pos i, Parsing.rhs_end_pos i)
-
-  let loc_dummy e =
-    mk_loc e (Lexing.dummy_pos, Lexing.dummy_pos)
+  let mk_loc e l = { info = l; node = e }
 
   type pvar =
     I of ident
@@ -38,9 +29,9 @@
 %token SEMI STAR USTAR COMMA
 %token ASSIGN
 %token LB RB LP RP
-%token EQUAL NOT_EQUAL
+%token EQ NEQ
 %token AND OR LT LTE GT GTE
-%token PLUS MINUS DIV MOD UPLUS UMINUS /* MULT = STAR */
+%token MULT PLUS MINUS DIV MOD UPLUS UMINUS /* MULT = STAR */
 
 
 /* Priorités */
@@ -48,13 +39,14 @@
    %right ASSIGN
    %left OR
    %left AND
-   %left EQUAL NOT_EQUAL
+   %left EQ NEQ
    %left LT LTE GT GTE
    %left PLUS MINUS
    %left MULT DIV MOD
    %left NOT PLUSPLUS MINUSMINUS ADDR USTAR UPLUS UMINUS
    %right RP LB ARROW DOT
 
+   %right ustar uminus
 
 /* Point d'entrée */
 
@@ -64,14 +56,14 @@
 %%
 
 file:
-| l = list(decl) EOF { l }
+    | l = list(decl) EOF { l }
 ;
 
   /* déclarations */
 
 decl:
     | d = decl_var;  SEMI { Dvar(d) }
-    | STRUCT; i = IDENT; LB; l = list(terminated(decl_var, SEMI)); RB; SEMI  { Dstruct ((loc i), l) }
+    | STRUCT; i = ident; LB; l = list(terminated(decl_var, SEMI)); RB; SEMI  { Dstruct ( i, l) }
     | EXTERN; t = var_type; v = var; LP; l = separated_list(COMMA, decl_var); RP; SEMI { let t, i = unvar t v in Dfun(t, i, l, None) }
     | t=var_type; v=var; LP; l = separated_list(COMMA, decl_var); RP; b = block { let t, i = unvar t v in Dfun(t, i, l, None) }
     | t=var_type; v=var; LP; l = separated_list(COMMA, decl_var); RP; SEMI { let t, i = unvar t v in Dfun(t, i, l, None) }
@@ -81,43 +73,71 @@ block:
     | LB; lb = list(terminated(decl_var, SEMI)); li = list(instr); RB { (lb, li) }
 ;
 
+instr_:
+    | SEMI { Sskip }
+    | e = expr; SEMI { Sexpr e }
+;
+
 instr:
-    | SEMI { loc Sskip }
-    | e = expr; SEMI { loc (Sexpr e) }
+    | i = instr_         { mk_loc i ($startpos, $endpos) }
+
+expr_:
+    | i = ident                        { Eident i           }
+    | e1=expr; op=binop; e2=expr       { Ebinop(e1, op, e2) }
+    | MINUS ; e = expr                 { Eunop (Neg, e)     }
+    | STAR ; e = expr                  { Eunop (Deref, e)   }
+    | PLUS ; e = expr                  { Eunop (Pos, e)     }
+    | LP ; e = expr_ ; RP              { e                  }
 ;
 
 expr:
-    | i = IDENT                        { (loc (Eident (loc i))) }
-    | e1 = expr; op = binop; e2 = expr { (loc (Ebinop (e1, op, e2))) }
+    | e = expr_      { mk_loc e ($startpos, $endpos) }
+;
+
+ident:
+    | i = IDENT        { mk_loc i ($startpos, $endpos) }
 ;
 
 %inline binop:
-    | PLUS { Add }
+    | PLUS  { Add }
+    | MINUS { Minus }
+    | MULT  { Mult  }
+    | DIV   { Div   }
+    | MOD   { Mod   }
+    | AND   { And   }
+    | OR    { Or    }
+    | EQ    { Eq    }
+    | NEQ   { Neq   }
+    | LT    { Lt    }
+    | LTE   { Le    }
+    | GT    { Gt    }
+    | GTE   { Ge    }
+    ;
 
 var:
-    | i = IDENT { I( (loc i) ) }
+    | i = ident     { I ( i ) }
     | STAR; v = var { P ( v ) }
 
 decl_var:
-    | vt=var_type v = var{ unvar vt v }
+    | vt=var_type v = var { unvar vt v }
 ;
 
 var_type:
-  | s=signedness t=integer_type  { Tinteger(s, t) }
-  | VOID                         { Tvoid }
-  | DOUBLE                       { Tdouble }
+    | s=signedness t=integer_type  { Tinteger(s, t) }
+    | VOID                         { Tvoid }
+    | DOUBLE                       { Tdouble }
 ;
 
 signedness:
-  |          { Signed }
-  | UNSIGNED { Unsigned }
+    |          { Signed }
+    | UNSIGNED { Unsigned }
 ;
 
 integer_type:
-  | CHAR  { Char }
-  | SHORT { Short }
-  | INT   { Int }
-  | LONG  { Long }
+    | CHAR  { Char }
+    | SHORT { Short }
+    | INT   { Int }
+    | LONG  { Long }
 ;
 
 
