@@ -7,7 +7,7 @@
   let mk_loc e l = { info = l; node = e }
 
   type pvar =
-    I of ident
+  | I of ident
   | P of pvar
 
   let rec unvar t v =
@@ -26,12 +26,14 @@
 %token DOUBLE
 %token UNSIGNED
 %token STRUCT EXTERN
-%token SEMI STAR USTAR COMMA
+%token SEMI STAR USTAR COMMA ARROW DOT
 %token ASSIGN
 %token LB RB LP RP
 %token EQ NEQ
-%token AND OR LT LTE GT GTE
-%token MULT PLUS MINUS DIV MOD UPLUS UMINUS /* MULT = STAR */
+%token AND OR LT LTE GT GTE NOT LAND LBRACKET RBRACKET
+%token PLUS MINUS DIV MULT MOD UPLUS UMINUS /* MULT = STAR */
+%token SIZEOF WHILE FOR IF ELSE RETURN
+%token PLUSPLUS MINUSMINUS
 
 
 /* Priorités */
@@ -117,6 +119,7 @@ ident:
 var:
     | i = ident     { I ( i ) }
     | STAR; v = var { P ( v ) }
+      ;
 
 decl_var:
     | vt=var_type v = var { unvar vt v }
@@ -143,3 +146,8 @@ integer_type:
 
   l_expr:
     l = separated_list(COMMA, expr) { l }
+;
+
+  complex_type:
+  | t = var_type STAR      { " " }
+;

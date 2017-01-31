@@ -27,6 +27,12 @@
                     "unsigned", UNSIGNED;
                     "struct", STRUCT;
                     "extern", EXTERN;
+		    "sizeof", SIZEOF;
+                    "if", IF;
+                    "else", ELSE;
+                    "while", WHILE;
+                    "for", FOR;
+                    "return", RETURN;
                   ]	;
     with Not_found -> IDENT s
 
@@ -63,6 +69,14 @@ rule token = parse
   | "%"              { MOD }
   | "&&"             { AND }
   | "||"             { OR }
+  | "++"             { PLUSPLUS }
+  | "--"             { MINUSMINUS }
+  | "!"              { NOT }
+  | "&"              { LAND }
+  | "->"             { ARROW }
+  | "."              { DOT }
+  | "["              { LBRACKET }
+  | "]"              { RBRACKET }
   | const_int        { NUM (Int32.of_string (lexeme lexbuf)) }
   | identifier       { keyword_or_ident(lexeme lexbuf) }
   | "/*"             { comment lexbuf }
