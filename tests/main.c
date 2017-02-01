@@ -1,7 +1,7 @@
 int main() {
-	int x;
-	x++;
-	sizeof(double);
-	return x;
+  int x;
+  x = 42;
+  ++x;
+  x--;
 }
 

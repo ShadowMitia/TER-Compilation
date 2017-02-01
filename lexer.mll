@@ -24,6 +24,7 @@
                     "char", CHAR;
                     "short", SHORT;
                     "long", LONG;
+                    "double", DOUBLE;
                     "unsigned", UNSIGNED;
                     "struct", STRUCT;
                     "extern", EXTERN;
@@ -33,7 +34,7 @@
                     "while", WHILE;
                     "for", FOR;
                     "return", RETURN;
-                  ]	;
+                  ];
     with Not_found -> IDENT s
 
 }

@@ -15,6 +15,7 @@
     | I i -> (t, i)
     | P vv -> unvar (Tpointer t) vv
 
+
 %}
 
 %token EOF
@@ -38,17 +39,16 @@
 
 /* Priorités */
 
-   %right ASSIGN
-   %left OR
-   %left AND
-   %left EQ NEQ
-   %left LT LTE GT GTE
-   %left PLUS MINUS
-   %left MULT DIV MOD
-   %left NOT PLUSPLUS MINUSMINUS ADDR USTAR UPLUS UMINUS
-   %right RP LB ARROW DOT
-
-   %right ustar uminus
+%right ASSIGN
+%left OR
+%left AND
+%left EQ NEQ
+%left LT LTE GT GTE
+%left PLUS MINUS
+%left MULT DIV MOD
+%left NOT PLUSPLUS MINUSMINUS ADDR USTAR UPLUS UMINUS
+%right RP LB ARROW DOT
+%right ustar uminus
 
 /* Point d'entrée */
 
@@ -61,7 +61,7 @@ file:
     | l = list(decl) EOF { l }
 ;
 
-  /* déclarations */
+/* déclarations */
 
 decl:
     | d = decl_var;  SEMI { Dvar(d) }
@@ -76,32 +76,51 @@ block:
 ;
 
 instr_:
-    | SEMI { Sskip }
-    | e = expr; SEMI { Sexpr e }
+    | SEMI                               {  }
+    | e = expr; SEMI                     {  }
+    | IF; LP; e = expr; RP; i = instr    {  }
+    | IF; LP; e = expr; RP; i = instr; ELSE; i2 = instr;  {  }
+    | WHILE; LP; e = expr; RP; i = instr { }
+    | FOR; LP; le = l_expr; SEMI;  e = expr; SEMI; le2 = l_expr; RP; i = instr { }
+    | b = block                          { }
+    | RETURN e = expr; SEMI              { }
 ;
 
 instr:
-    | i = instr_         { mk_loc i ($startpos, $endpos) }
+    | i = instr_                       { mk_loc i ($startpos, $endpos) }
+;
 
 expr_:
-    | i = ident                        { Eident i           }
-    | e1=expr; op=binop; e2=expr       { Ebinop(e1, op, e2) }
-    | MINUS ; e = expr                 { Eunop (Neg, e)     }
-    | STAR ; e = expr                  { Eunop (Deref, e)   }
-    | PLUS ; e = expr                  { Eunop (Pos, e)     }
-    | LP ; e = expr_ ; RP              { e                  }
+    | i = ident                                { }
+    | STAR ; e = expr                          { }
+    | e1 = expr; LBRACKET; e2 = expr; RBRACKET { }
+    | e = expr; DOT; i = instr                 { }
+    | e = expr; ARROW; i = instr               { }
+    | e = expr; ASSIGN; i = instr              { }
+    | i = ident; LP; le = l_expr; RP           { }
+    | PLUSPLUS; e = expr                       { }
+    | MINUSMINUS; e = expr                     { }
+    | e = expr; PLUSPLUS                       { }
+    | e = expr; MINUSMINUS                     { }
+    | LAND; e = expr;                          { }
+    | NOT;  e = expr;                          { }
+    | MINUS; e = expr;                         { }
+    | PLUS; e = expr;                          { }
+    | e1=expr; op=binop; e2=expr               { }
+    | SIZEOF; LP; c=cplx_type; RP              { }
+    | LP ; e = expr_ ; RP                      { }
 ;
 
 expr:
-    | e = expr_      { mk_loc e ($startpos, $endpos) }
+    | e = expr_                        { mk_loc e ($startpos, $endpos) }
 ;
 
 ident:
-    | i = IDENT        { mk_loc i ($startpos, $endpos) }
+    | i = IDENT                        { mk_loc i ($startpos, $endpos) }
 ;
 
 %inline binop:
-    | PLUS  { Add }
+    | PLUS  { Add   }
     | MINUS { Minus }
     | MULT  { Mult  }
     | DIV   { Div   }
@@ -114,12 +133,12 @@ ident:
     | LTE   { Le    }
     | GT    { Gt    }
     | GTE   { Ge    }
-    ;
+;
 
 var:
     | i = ident     { I ( i ) }
     | STAR; v = var { P ( v ) }
-      ;
+;
 
 decl_var:
     | vt=var_type v = var { unvar vt v }
@@ -148,6 +167,6 @@ integer_type:
     l = separated_list(COMMA, expr) { l }
 ;
 
-  complex_type:
+  cplx_type:
   | t = var_type STAR      { " " }
 ;
