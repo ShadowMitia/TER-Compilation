@@ -45,11 +45,13 @@ let max_type t1 t2 =
 
 let num t =
 	match t with
-	|
+	| Tstruct _ | Tvoid -> false
+	| _ -> true
 
 let arith t =
 	match t with
-	|
+	| Tstruct _ | Tvoid | Tpointer _ -> false
+	| _ -> true
 
 exception TypeError of loc * string
 let error loc msg = raise (TypeError (loc, msg))
@@ -90,7 +92,7 @@ let type_const c =
 	| Cint(s, i, _) -> Tinteger (s, i)*)
 	| _ -> assert false
 
-let type_expr env e =
+let rec type_expr env e =
 	match e.node with
 	| Econst c -> let tc = type_const c in
 					mk_node tc (Econst c)
@@ -101,8 +103,8 @@ let type_expr env e =
 						error e0.info "Type invalide"
 					else
 						mk_node te0.info (Eunop(Neg, te0))
-			| Deref -> let te0 = type_lvalue env e0 in
-						assert false
+			(*| Deref -> let te0 = type_lvalue env e0 in
+						assert false*)
 		end
 
 	| _ -> type_lvalue env e
