@@ -81,8 +81,12 @@ rule token = parse
   | const_int        { NUM (Int32.of_string (lexeme lexbuf)) }
   | identifier       { keyword_or_ident(lexeme lexbuf) }
   | "/*"             { comment lexbuf }
+  | "#"              { macro lexbuf }
   | _                { raise (Lexical_error ("illegal character: " ^ lexeme lexbuf)) }
 and comment = parse
             | "*/" { token lexbuf }
-            | _ {comment lexbuf }
-  | eof  { failwith "Lexical error : unterminated comment" }
+            | _    { comment lexbuf }
+            | eof  { failwith "Lexical error : unterminated comment" }
+and macro = parse
+          | _    { macro lexbuf }
+          | ['\r' '\n']+ { token lexbuf }
