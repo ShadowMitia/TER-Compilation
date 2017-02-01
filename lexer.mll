@@ -28,7 +28,7 @@
                     "unsigned", UNSIGNED;
                     "struct", STRUCT;
                     "extern", EXTERN;
-		    "sizeof", SIZEOF;
+		            "sizeof", SIZEOF;
                     "if", IF;
                     "else", ELSE;
                     "while", WHILE;
