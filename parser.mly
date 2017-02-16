@@ -63,12 +63,13 @@ file:
 /* déclarations */
 
 declarations:
+   (* Variable declarations *)
    | decl_vars=declare_variable SEMI { Dvar(decl_vars) }
 ;
 
 
 declare_variable:
-    ctype=c_type cvar=c_variable { unvar ctype cvar }
+   | ctype=c_type cvar=c_variable { unvar ctype cvar }
 ;
 
 c_variable:
@@ -81,9 +82,9 @@ c_type:
    | cinttype=c_int_type { cinttype }
    | DOUBLE              { Tdouble }
    | STRUCT i=identifier { Tstruct i}
-   ;
+;
 
-     identifier:
+identifier:
    |   i = IDENT { mk_loc i ($startpos, $endpos) }
    ;
 

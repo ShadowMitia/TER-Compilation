@@ -102,6 +102,7 @@ depend: $(SMLIYL)
 test:
 	@for i in $(shell ls tests/*.c); do \
 		echo -n "Testing on " \"$$i\"; \
-		./$(EXEC) $$i >/dev/null 2>&1; \
+		 ./$(EXEC) $$i >/dev/null 2>&1; \
+		#./$(EXEC) $$i; \
 		if [[ ("$$?" -ne 0 && "$$i" = *".fail."* )  || ( "$$?" -eq 0 && "$$i" = *".pass."* ) ]]; then echo "	[PASSED]"; else echo "	[FAILED]"; fi \
 	done
