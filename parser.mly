@@ -15,24 +15,24 @@
     | I i -> (t, i)
     | P vv -> unvar (Tpointer t) vv
 
-
 %}
 
 %token EOF
 %token <string> IDENT
 %token <int32>  NUM
+%token <float> NUM_FLOAT
 
 %token VOID
 %token CHAR SHORT INT LONG
 %token DOUBLE
 %token UNSIGNED
 %token STRUCT EXTERN
-%token SEMI STAR USTAR COMMA ARROW DOT
+%token SEMI STAR COMMA ARROW DOT
 %token ASSIGN
-%token LB RB LP RP
+%token LBRACKET RBRACKET LPAR RPAR L_SQ_BRACKET R_SQ_BRACKET
 %token EQ NEQ
-%token AND OR LT LTE GT GTE NOT LAND LBRACKET RBRACKET
-%token PLUS MINUS DIV MULT MOD UPLUS UMINUS /* MULT = STAR */
+%token AND OR LT LTE GT GTE NOT LAND
+%token PLUS MINUS DIV MOD
 %token SIZEOF WHILE FOR IF ELSE RETURN
 %token PLUSPLUS MINUSMINUS
 
@@ -45,10 +45,9 @@
 %left EQ NEQ
 %left LT LTE GT GTE
 %left PLUS MINUS
-%left MULT DIV MOD
-%left NOT PLUSPLUS MINUSMINUS ADDR USTAR UPLUS UMINUS
-%right RP LB ARROW DOT
-%right ustar uminus
+%left STAR DIV MOD
+%left NOT PLUSPLUS MINUSMINUS
+%right RPAR LBRACKET ARROW DOT
 
 /* Point d'entrée */
 
@@ -58,115 +57,160 @@
 %%
 
 file:
-    | l = list(decl) EOF { l }
+    | l = list(declarations) EOF { l }
 ;
 
 /* déclarations */
 
-decl:
-    | d = decl_var;  SEMI { Dvar(d) }
-    | STRUCT; i = ident; LB; l = list(terminated(decl_var, SEMI)); RB; SEMI  { Dstruct ( i, l) }
-    | EXTERN; t = var_type; v = var; LP; l = separated_list(COMMA, decl_var); RP; SEMI { let t, i = unvar t v in Dfun(t, i, l, None) }
-    | t=var_type; v=var; LP; l = separated_list(COMMA, decl_var); RP; b = block { let t, i = unvar t v in Dfun(t, i, l, None) }
-    | t=var_type; v=var; LP; l = separated_list(COMMA, decl_var); RP; SEMI { let t, i = unvar t v in Dfun(t, i, l, None) }
+declarations:
+   | decl_vars=declare_variable SEMI { Dvar(decl_vars) }
 ;
 
-block:
-    | LB; lb = list(terminated(decl_var, SEMI)); li = list(instr); RB { (lb, li) }
+
+declare_variable:
+    ctype=c_type cvar=c_variable { unvar ctype cvar }
 ;
 
-instr_:
-    | SEMI                               {  }
-    | e = expr; SEMI                     {  }
-    | IF; LP; e = expr; RP; i = instr    {  }
-    | IF; LP; e = expr; RP; i = instr; ELSE; i2 = instr;  {  }
-    | WHILE; LP; e = expr; RP; i = instr { }
-    | FOR; LP; le = l_expr; SEMI;  e = expr; SEMI; le2 = l_expr; RP; i = instr { }
-    | b = block                          { }
-    | RETURN e = expr; SEMI              { }
+c_variable:
+    | i = identifier       { I ( i ) }
+    | STAR; v = c_variable { P ( v ) }
 ;
 
-instr:
-    | i = instr_                       { mk_loc i ($startpos, $endpos) }
-;
+c_type:
+   | VOID                { Tvoid }
+   | cinttype=c_int_type { cinttype }
+   | DOUBLE              { Tdouble }
+   | STRUCT i=identifier { Tstruct i}
+   ;
 
-expr_:
-    | i = ident                                { }
-    | STAR ; e = expr                          { }
-    | e1 = expr; LBRACKET; e2 = expr; RBRACKET { }
-    | e = expr; DOT; i = instr                 { }
-    | e = expr; ARROW; i = instr               { }
-    | e = expr; ASSIGN; i = instr              { }
-    | i = ident; LP; le = l_expr; RP           { }
-    | PLUSPLUS; e = expr                       { }
-    | MINUSMINUS; e = expr                     { }
-    | e = expr; PLUSPLUS                       { }
-    | e = expr; MINUSMINUS                     { }
-    | LAND; e = expr;                          { }
-    | NOT;  e = expr;                          { }
-    | MINUS; e = expr;                         { }
-    | PLUS; e = expr;                          { }
-    | e1=expr; op=binop; e2=expr               { }
-    | SIZEOF; LP; c=cplx_type; RP              { }
-    | LP ; e = expr_ ; RP                      { }
-;
-
-expr:
-    | e = expr_                        { mk_loc e ($startpos, $endpos) }
-;
-
-ident:
-    | i = IDENT                        { mk_loc i ($startpos, $endpos) }
-;
-
-%inline binop:
-    | PLUS  { Add   }
-    | MINUS { Minus }
-    | MULT  { Mult  }
-    | DIV   { Div   }
-    | MOD   { Mod   }
-    | AND   { And   }
-    | OR    { Or    }
-    | EQ    { Eq    }
-    | NEQ   { Neq   }
-    | LT    { Lt    }
-    | LTE   { Le    }
-    | GT    { Gt    }
-    | GTE   { Ge    }
-;
-
-var:
-    | i = ident     { I ( i ) }
-    | STAR; v = var { P ( v ) }
-;
-
-decl_var:
-    | vt=var_type v = var { unvar vt v }
-;
-
-var_type:
-    | s=signedness t=integer_type  { Tinteger(s, t) }
-    | VOID                         { Tvoid }
-    | DOUBLE                       { Tdouble }
-;
+     identifier:
+   |   i = IDENT { mk_loc i ($startpos, $endpos) }
+   ;
 
 signedness:
-    |          { Signed }
-    | UNSIGNED { Unsigned }
+   |          { Signed }
+   | UNSIGNED { Unsigned }
 ;
 
-integer_type:
+c_int_type:
+   | s=signedness cit=c_int_types { Tinteger(s, cit) }
+;
+
+%inline c_int_types:
     | CHAR  { Char }
     | SHORT { Short }
     | INT   { Int }
     | LONG  { Long }
 ;
 
+(* declaration: *)
+(*     | d = decl_var;  SEMI { Dvar(d) } *)
+(*     | STRUCT; i = ident; LBRACKET; l = list(terminated(decl_var, SEMI)); RBRACKET; SEMI  { Dstruct (i, l) } *)
+(*     | EXTERN; t = var_type; v = var; LPAR; l = separated_list(COMMA, decl_var); RPAR; SEMI { let t, i = unvar t v in Dfun(t, i, l, None) } *)
+(*     | t=var_type; v=var; LPAR; l = separated_list(COMMA, decl_var); RPAR; b = block { let t, i = unvar t v in Dfun(t, i, l, Some b) } *)
+(* ; *)
 
-  l_expr:
-    l = separated_list(COMMA, expr) { l }
-;
+(* block: *)
+(*     | LBRACKET; lb = list(terminated(decl_var, SEMI)); li = list(instr); RBRACKET { (lb, li) } *)
+(* ; *)
 
-  cplx_type:
-  | t = var_type STAR      { " " }
-;
+(* instr_: *)
+(*     | SEMI                                                                      { (Sskip) } *)
+(*     | e = expr; SEMI                                                            { (Sexpr e) } *)
+(*     (\*| IF; LP; e = expr; RP; i = instr                                           { (Sif(e, i, None)) } *)
+(*     | IF; LP; e = expr; RP; i = instr; ELSE; i2 = instr;                        { (Sif(e, i, Some i2)) } *)
+(*     | WHILE; LP; e = expr;  RP; i = instr                                       { (Swhile(e, i)) } *)
+(*     | FOR; LP; le = l_expr; SEMI;  e = expr; SEMI; le2 = l_expr; RP; i = instr  { (Swhile(e, i)) } *)
+(*     | b = block                                                                 { (Sblock b) } *)
+(*     | RETURN e = expr SEMI                                                     { (Sreturn (Some e)) } *)
+(*     | RETURN SEMI                                                               { (Sreturn None) }*\) *)
+(* ; *)
+
+(* instr: *)
+(*     | i = instr_                               { mk_loc i ($startpos, $endpos) } *)
+(* ; *)
+
+(* expr_: *)
+(*     | i = ident                                    { mk_loc (Eident(i)) ($startpos, $endpos)} *)
+(*     //| e1 = expr; LB; e2 = expr; RBRACKET   { Egetarr(mk_loc e1.node e1.info, mk_loc e2.node e2.info) } *)
+(*     //| e = expr; DOT; i = ident                   { Eident(mk_loc i.node i.info) } *)
+(*     //| e = expr; ARROW; i = ident                 { Eunop(Deref, Eident(mk_loc i.node i.info)) } *)
+(*     //| e = expr; ASSIGN; e2 = expr                { Eassign(mk_loc e.node e.info, mk_loc e2.node e2.info) } *)
+(*     //| i = ident; LP; le = l_expr; RP             { Ecall(i, le) } *)
+(*     //| PLUSPLUS; e = expr                         { Eunop(PreInc, e)  } *)
+(*     //| MINUSMINUS; e = expr                       { Eunop(PreDec, e)  } *)
+(*     //| e = expr; PLUSPLUS                         { Eunop(PostInc, e) } *)
+(*     //| e = expr; MINUSMINUS                       { Eunop(PostDec, e) } *)
+(*     //| u=unop; e = expr;                          { Eunop(u, e) } *)
+(*       | e1=expr; op=binop; e2=expr                   { mk_loc (Ebinop (mk_loc e1.node e1.info, op, mk_loc e2.node e2.info)) ($startpos, $endpos) } *)
+(*     //| SIZEOF; LP; c=cplx_type; RP                { Esizeof(c) } *)
+(*     //| n=NUM                                      { Econst(mk_loc Cint(n) ($startpos, $endpos)) } *)
+(*     //| n=NUM_FLOAT                                { Econst(mk_loc Cdouble(n) ($startpos, $endpos)) } *)
+(* ; *)
+
+(* expr: *)
+(*     | e = expr_                        { mk_loc e ($startpos, $endpos) } *)
+(* ; *)
+
+(* ident: *)
+(*     | i = IDENT                        { mk_loc i ($startpos, $endpos) } *)
+(* ; *)
+
+(* %inline unop: *)
+(*     | MINUS { Neg } *)
+(*     | LAND  { Addr } *)
+(*     | PLUS  { Pos } *)
+(*     | NOT   { Not } *)
+(*     | STAR  { Deref } *)
+(*     ; *)
+
+(* %inline binop: *)
+(*     | PLUS  { Add   } *)
+(*     | MINUS { Minus } *)
+(*     | MULT  { Mult  } *)
+(*     | DIV   { Div   } *)
+(*     | MOD   { Mod   } *)
+(*     | AND   { And   } *)
+(*     | OR    { Or    } *)
+(*     | EQ    { Eq    } *)
+(*     | NEQ   { Neq   } *)
+(*     | LT    { Lt    } *)
+(*     | LTE   { Le    } *)
+(*     | GT    { Gt    } *)
+(*     | GTE   { Ge    } *)
+(* ; *)
+
+(* var: *)
+(*     | i = ident     { I ( i ) } *)
+(*     | STAR; v = var { P ( v ) } *)
+(* ; *)
+
+(* decl_var: *)
+(*     | var_t=var_type var=var { unvar var_t var } *)
+(* ; *)
+
+(* var_type: *)
+(*     | s=signedness i_t=integer_type  { Tinteger(s, i_t) } *)
+(*     | VOID                           { Tvoid } *)
+(*     | DOUBLE                         { Tdouble } *)
+(* ; *)
+
+(* signedness: *)
+(*     |          { Signed } *)
+(*     | UNSIGNED { Unsigned } *)
+(* ; *)
+
+(* integer_type: *)
+(*     | CHAR  { Char } *)
+(*     | SHORT { Short } *)
+(*     | INT   { Int } *)
+(*     | LONG  { Long } *)
+(* ; *)
+
+(* l_expr: *)
+(*     l = separated_list(COMMA, expr) { l } *)
+(* ; *)
+
+(* cplx_type: *)
+(*     | t=var_type    { t } *)
+(* ; *)

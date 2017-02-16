@@ -1,0 +1,11 @@
+int i;
+char c;
+short s;
+long l;
+unsigned int ii;
+unsigned char cc;
+unsigned short ss;
+unsigned long ll;
+void v;
+double d;
+struct sss;
