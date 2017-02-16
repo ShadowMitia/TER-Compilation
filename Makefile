@@ -99,9 +99,9 @@ depend: $(SMLIYL)
 -include depend
 
 
-
 test:
-	@for i in $(shell ls tests); do \
-		echo "Testing on " $$i; \
-		./$(EXEC) "tests/"$$i; \
+	@for i in $(shell ls tests/*.c); do \
+		echo -n "Testing on " \"$$i\"; \
+		./$(EXEC) $$i >/dev/null 2>&1; \
+		if [[ ("$$?" -ne 0 && "$$i" = *".fail."* )  || ( "$$?" -eq 0 && "$$i" = *".pass."* ) ]]; then echo "	[PASSED]"; else echo "	[FAILED]"; fi \
 	done
