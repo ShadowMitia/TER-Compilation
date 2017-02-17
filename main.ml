@@ -5,7 +5,7 @@ open Lexing
 open Lexer
 open Parser
 open Ast
-(* open Typing *)
+open Typing
 
 let usage = "usage: compilo [options] file.c"
 
@@ -43,7 +43,7 @@ let () =
     let p = Parser.file Lexer.token lb in
     close_in c;
     if !parse_only then exit 0;
-(*    let tp = Typing.type_prog p in () (*pour l'instant j'en fais rien cf part 3*) *)
+    let tp = Typing.type_prog p in () (*pour l'instant j'en fais rien cf part 3*)
   with
     | Lexical_error s ->
 	report_loc (lexeme_start_p lb, lexeme_end_p lb);
