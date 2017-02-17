@@ -4,7 +4,7 @@
 # a.ml, a.ml doit se trouver avant dans la liste.
 #
 
-SOURCES = ast.mli parser.mly lexer.mll typing.ml main.ml 
+SOURCES = ast.mli parser.mly lexer.mll main.ml 
 
 # Nom du binaire
 
@@ -100,9 +100,10 @@ depend: $(SMLIYL)
 
 
 test:
+#TODO: mieux detecter les valeurs de retours (tester la présence de noms d'exceptions)
 	@for i in $(shell ls tests/*.c); do \
 		echo -n "Testing on " \"$$i\"; \
-		 ./$(EXEC) $$i >/dev/null 2>&1; \
-		#./$(EXEC) $$i; \
+		# ./$(EXEC) $$i >/dev/null 2>&1; \
+		./$(EXEC) $$i; \
 		if [[ ("$$?" -ne 0 && "$$i" = *".fail."* )  || ( "$$?" -eq 0 && "$$i" = *".pass."* ) ]]; then echo "	[PASSED]"; else echo "	[FAILED]"; fi \
 	done

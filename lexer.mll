@@ -44,7 +44,9 @@ let alpha = ['a'-'z' 'A'-'Z']
 let identifier = (alpha | ['_']) (alpha | digit | ['_'])*
 let const_int = (digit+) (['u'] | ['U'])?(['l'] | ['L'])?
 let const_float = (digit+['.']digit* | ['.']digit+)((['e'] | ['E'])['-']?digit+)?
-let char = ([' '-'~']#['\'' '\\' '\"'])
+let const_char = ([' '-'~']#['\'' '\\' '\"'])
+let const_string = ['\"'] (const_char | [' '] | ['\t'])+ ['\"']
+
 
 rule token = parse
   | '\n'             { newline lexbuf; token lexbuf }
@@ -81,6 +83,8 @@ rule token = parse
   | "]"              { R_SQ_BRACKET }
   | const_int        { NUM (Int32.of_string (lexeme lexbuf)) }
   | const_float      { NUM_FLOAT (float_of_string (lexeme lexbuf)) }
+  (*| const_char       { CONST_STRING (lexeme lexbuf) }*)
+  | const_string     { CONST_STRING (lexeme lexbuf)  }
   | identifier       { keyword_or_ident(lexeme lexbuf) }
   | "/*"             { comment lexbuf }
   | "#"              { macro lexbuf }

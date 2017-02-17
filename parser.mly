@@ -21,6 +21,8 @@
 %token <string> IDENT
 %token <int32>  NUM
 %token <float> NUM_FLOAT
+%token <string> CONST_STRING
+%token <string> CONST_CHAR
 
 %token VOID
 %token CHAR SHORT INT LONG
@@ -64,11 +66,39 @@ file:
 
 declarations:
    (* Variable declarations *)
-   | decl_vars=declare_variable SEMI { Dvar(decl_vars) }
+   | decl_vars=variable_declaration SEMI { Dvar(decl_vars) }
+   (* Struct declarations *)
+   | STRUCT i=identifier LBRACKET decl_vars_list=list(terminated(variable_declaration, SEMI)) RBRACKET SEMI { Dstruct(i, decl_vars_list)  }
+   (* Function declarations *)
+   | fun_type=c_type fun_identifier=c_variable LPAR fun_args=separated_list(COMMA, variable_declaration) RPAR fun_block=block {  let t, i = unvar fun_type fun_identifier in Dfun(t, i, fun_args, Some fun_block)  }
+   | fun_type=c_type fun_identifier=c_variable LPAR fun_args=separated_list(COMMA, variable_declaration) RPAR SEMI {  let t, i = unvar fun_type fun_identifier in Dfun(t, i, fun_args, None)  }
 ;
 
+block:
+   | LBRACKET; lb = list(terminated(variable_declaration, SEMI)); li = list(instruction); RBRACKET { (lb, li) }
+;
 
-declare_variable:
+instruction_:
+   | SEMI { Sskip }
+   | expr = expression { Sexpr expr }
+   | IF LPAR expr = expression RPAR instr = instruction { Sif(expr, instr, None) }
+   | b = block { Sblock b }
+;
+
+instruction:
+   | i = instruction_ { mk_loc i ($startpos, $endpos) }
+;
+
+expression_:
+   | n = NUM { Econst(Cint(n))  }
+   | n = NUM_FLOAT { Econst(Cdouble(n))     }
+;
+
+expression:
+   | e = expression_ { mk_loc e ($startpos, $endpos) }
+;
+
+variable_declaration:
    | ctype=c_type cvar=c_variable { unvar ctype cvar }
 ;
 
