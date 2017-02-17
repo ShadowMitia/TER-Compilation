@@ -33,7 +33,7 @@
 %token ASSIGN
 %token LBRACKET RBRACKET LPAR RPAR L_SQ_BRACKET R_SQ_BRACKET
 %token EQ NEQ
-%token AND OR LT LTE GT GTE NOT LAND
+%token AND OR LT LTE GT GTE NOT BAND
 %token PLUS MINUS DIV MOD
 %token SIZEOF WHILE FOR IF ELSE RETURN
 %token PLUSPLUS MINUSMINUS
@@ -72,6 +72,8 @@ declarations:
    (* Function declarations *)
    | fun_type=c_type fun_identifier=c_variable LPAR fun_args=separated_list(COMMA, variable_declaration) RPAR fun_block=block {  let t, i = unvar fun_type fun_identifier in Dfun(t, i, fun_args, Some fun_block)  }
    | fun_type=c_type fun_identifier=c_variable LPAR fun_args=separated_list(COMMA, variable_declaration) RPAR SEMI {  let t, i = unvar fun_type fun_identifier in Dfun(t, i, fun_args, None)  }
+   (* Extern declarations *)
+   | EXTERN fun_type=c_type fun_identifier=c_variable LPAR fun_args=separated_list(COMMA, variable_declaration) RPAR SEMI {  let t, i = unvar fun_type fun_identifier in Dfun(t, i, fun_args, None)  }
 ;
 
 block:
@@ -82,16 +84,49 @@ instruction_:
    | SEMI { Sskip }
    | expr = expression { Sexpr expr }
    | IF LPAR expr = expression RPAR instr = instruction { Sif(expr, instr, None) }
+   | IF LPAR expr = expression RPAR instr1 = instruction ELSE instr2 = instruction { Sif(expr, instr1, Some instr2) }
+   | WHILE LPAR expr = expression RPAR instr = instruction { Swhile(expr, instr) }
+   (*
+                                                                                                   Swhile(Sexpr(1), instr) }
+   | FOR LPAR SEMI SEMI RPAR instr = instruction {
+                                         Swhile(Sexpr(1), instr) }
+       *)
    | b = block { Sblock b }
+   | RETURN expr = expression SEMI { Sreturn (Some expr) }
+   | RETURN SEMI { Sreturn None }
 ;
 
 instruction:
    | i = instruction_ { mk_loc i ($startpos, $endpos) }
 ;
 
+l_expr:
+    l = separated_list(COMMA, expression) { l }
+;
+
 expression_:
    | n = NUM { Econst(Cint(n))  }
    | n = NUM_FLOAT { Econst(Cdouble(n))     }
+   | i = identifier { Eident(i) }
+   | STAR expr = expression { Eunop(Deref, expr)  }
+   | expr1 = expression L_SQ_BRACKET expr2 = expression R_SQ_BRACKET { Egetarr(expr1, expr2) }
+   | expr = expression DOT id = identifier SEMI { Ebinop(expr, Dot, mk_loc (Eident id) id.info) }
+   | expr = expression ARROW id = identifier SEMI { Ebinop(expr, Arrow, mk_loc (Eident id) id.info )  }
+   | expr1 = expression ASSIGN expr2 = expression { Eassign(expr1, expr2) }
+   | i = identifier LPAR lexpr = l_expr RPAR   { Ecall(mk_loc (Eident i) i.info, lexpr)  }
+   | PLUSPLUS expr = expression { Eunop(PreInc, expr) }
+   | MINUSMINUS expr = expression { Eunop(PreDec, expr) }
+   | expr = expression PLUSPLUS { Eunop(PostInc, expr) }
+   | expr = expression MINUSMINUS { Eunop(PostDec, expr) }
+   | uop = unop expr = expression { Eunop(uop, expr) }
+   | expr1 = expression op = binop expr2 = expression { Ebinop(expr1, op, expr2) }
+   | SIZEOF LPAR cplxtype = cplx_type RPAR {(Esizeof cplxtype) }
+   | LPAR cplxtype = cplx_type RPAR expr = expression { Ecast(cplxtype, expr) }
+   | LPAR expr = expression_ RPAR { expr }
+   ;
+
+cplx_type:
+   | t = c_type { t }
 ;
 
 expression:
@@ -132,116 +167,28 @@ c_int_type:
     | SHORT { Short }
     | INT   { Int }
     | LONG  { Long }
+    ;
+
+%inline unop:
+    | MINUS { Neg }
+    | BAND  { Addr }
+    | PLUS  { Pos }
+    | NOT   { Not }
+    | STAR  { Deref }
 ;
 
-(* declaration: *)
-(*     | d = decl_var;  SEMI { Dvar(d) } *)
-(*     | STRUCT; i = ident; LBRACKET; l = list(terminated(decl_var, SEMI)); RBRACKET; SEMI  { Dstruct (i, l) } *)
-(*     | EXTERN; t = var_type; v = var; LPAR; l = separated_list(COMMA, decl_var); RPAR; SEMI { let t, i = unvar t v in Dfun(t, i, l, None) } *)
-(*     | t=var_type; v=var; LPAR; l = separated_list(COMMA, decl_var); RPAR; b = block { let t, i = unvar t v in Dfun(t, i, l, Some b) } *)
-(* ; *)
-
-(* block: *)
-(*     | LBRACKET; lb = list(terminated(decl_var, SEMI)); li = list(instr); RBRACKET { (lb, li) } *)
-(* ; *)
-
-(* instr_: *)
-(*     | SEMI                                                                      { (Sskip) } *)
-(*     | e = expr; SEMI                                                            { (Sexpr e) } *)
-(*     (\*| IF; LP; e = expr; RP; i = instr                                           { (Sif(e, i, None)) } *)
-(*     | IF; LP; e = expr; RP; i = instr; ELSE; i2 = instr;                        { (Sif(e, i, Some i2)) } *)
-(*     | WHILE; LP; e = expr;  RP; i = instr                                       { (Swhile(e, i)) } *)
-(*     | FOR; LP; le = l_expr; SEMI;  e = expr; SEMI; le2 = l_expr; RP; i = instr  { (Swhile(e, i)) } *)
-(*     | b = block                                                                 { (Sblock b) } *)
-(*     | RETURN e = expr SEMI                                                     { (Sreturn (Some e)) } *)
-(*     | RETURN SEMI                                                               { (Sreturn None) }*\) *)
-(* ; *)
-
-(* instr: *)
-(*     | i = instr_                               { mk_loc i ($startpos, $endpos) } *)
-(* ; *)
-
-(* expr_: *)
-(*     | i = ident                                    { mk_loc (Eident(i)) ($startpos, $endpos)} *)
-(*     //| e1 = expr; LB; e2 = expr; RBRACKET   { Egetarr(mk_loc e1.node e1.info, mk_loc e2.node e2.info) } *)
-(*     //| e = expr; DOT; i = ident                   { Eident(mk_loc i.node i.info) } *)
-(*     //| e = expr; ARROW; i = ident                 { Eunop(Deref, Eident(mk_loc i.node i.info)) } *)
-(*     //| e = expr; ASSIGN; e2 = expr                { Eassign(mk_loc e.node e.info, mk_loc e2.node e2.info) } *)
-(*     //| i = ident; LP; le = l_expr; RP             { Ecall(i, le) } *)
-(*     //| PLUSPLUS; e = expr                         { Eunop(PreInc, e)  } *)
-(*     //| MINUSMINUS; e = expr                       { Eunop(PreDec, e)  } *)
-(*     //| e = expr; PLUSPLUS                         { Eunop(PostInc, e) } *)
-(*     //| e = expr; MINUSMINUS                       { Eunop(PostDec, e) } *)
-(*     //| u=unop; e = expr;                          { Eunop(u, e) } *)
-(*       | e1=expr; op=binop; e2=expr                   { mk_loc (Ebinop (mk_loc e1.node e1.info, op, mk_loc e2.node e2.info)) ($startpos, $endpos) } *)
-(*     //| SIZEOF; LP; c=cplx_type; RP                { Esizeof(c) } *)
-(*     //| n=NUM                                      { Econst(mk_loc Cint(n) ($startpos, $endpos)) } *)
-(*     //| n=NUM_FLOAT                                { Econst(mk_loc Cdouble(n) ($startpos, $endpos)) } *)
-(* ; *)
-
-(* expr: *)
-(*     | e = expr_                        { mk_loc e ($startpos, $endpos) } *)
-(* ; *)
-
-(* ident: *)
-(*     | i = IDENT                        { mk_loc i ($startpos, $endpos) } *)
-(* ; *)
-
-(* %inline unop: *)
-(*     | MINUS { Neg } *)
-(*     | LAND  { Addr } *)
-(*     | PLUS  { Pos } *)
-(*     | NOT   { Not } *)
-(*     | STAR  { Deref } *)
-(*     ; *)
-
-(* %inline binop: *)
-(*     | PLUS  { Add   } *)
-(*     | MINUS { Minus } *)
-(*     | MULT  { Mult  } *)
-(*     | DIV   { Div   } *)
-(*     | MOD   { Mod   } *)
-(*     | AND   { And   } *)
-(*     | OR    { Or    } *)
-(*     | EQ    { Eq    } *)
-(*     | NEQ   { Neq   } *)
-(*     | LT    { Lt    } *)
-(*     | LTE   { Le    } *)
-(*     | GT    { Gt    } *)
-(*     | GTE   { Ge    } *)
-(* ; *)
-
-(* var: *)
-(*     | i = ident     { I ( i ) } *)
-(*     | STAR; v = var { P ( v ) } *)
-(* ; *)
-
-(* decl_var: *)
-(*     | var_t=var_type var=var { unvar var_t var } *)
-(* ; *)
-
-(* var_type: *)
-(*     | s=signedness i_t=integer_type  { Tinteger(s, i_t) } *)
-(*     | VOID                           { Tvoid } *)
-(*     | DOUBLE                         { Tdouble } *)
-(* ; *)
-
-(* signedness: *)
-(*     |          { Signed } *)
-(*     | UNSIGNED { Unsigned } *)
-(* ; *)
-
-(* integer_type: *)
-(*     | CHAR  { Char } *)
-(*     | SHORT { Short } *)
-(*     | INT   { Int } *)
-(*     | LONG  { Long } *)
-(* ; *)
-
-(* l_expr: *)
-(*     l = separated_list(COMMA, expr) { l } *)
-(* ; *)
-
-(* cplx_type: *)
-(*     | t=var_type    { t } *)
-(* ; *)
+%inline binop:
+    | PLUS  { Add   }
+    | MINUS { Minus }
+    | STAR  { Mult  }
+    | DIV   { Div   }
+    | MOD   { Mod   }
+    | AND   { And   }
+    | OR    { Or    }
+    | EQ    { Eq    }
+    | NEQ   { Neq   }
+    | LT    { Lt    }
+    | LTE   { Le    }
+    | GT    { Gt    }
+    | GTE   { Ge    }
+;

@@ -76,7 +76,7 @@ rule token = parse
   | "++"             { PLUSPLUS }
   | "--"             { MINUSMINUS }
   | "!"              { NOT }
-  | "&"              { LAND }
+  | "&"              { BAND }
   | "->"             { ARROW }
   | "."              { DOT }
   | "["              { L_SQ_BRACKET }

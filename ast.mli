@@ -24,7 +24,7 @@ type constant =
   | Cdouble of float
   | Cstring of string
 
-type binop = Add | Mult | Minus | Div | Mod | And | Or | Eq  | Neq  | Lt  | Le  | Gt  | Ge
+type binop = Add | Mult | Minus | Div | Mod | And | Or | Eq  | Neq  | Lt  | Le  | Gt  | Ge | Dot | Arrow
 
 type unop = Neg | Deref | Pos | Addr | PreInc | PreDec | PostInc | PostDec | Not
 
@@ -34,10 +34,11 @@ and 'info expr_node =
   | Eident  of ident
   | Esizeof of c_type
   | Ebinop  of 'info expr * binop * 'info expr
-  | Eunop   of unop       * 'info expr
+  | Eunop   of  unop      * 'info expr
   | Ecall   of 'info expr * 'info expr list
   | Egetarr of 'info expr * 'info expr
   | Eassign of 'info expr * 'info expr
+  | Ecast   of c_type     * 'info expr
 
 type var_decl =  c_type * ident
 
