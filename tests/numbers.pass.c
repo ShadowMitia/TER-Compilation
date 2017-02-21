@@ -1,4 +1,4 @@
-void test() {
+void number_test() {
   42;
   -42;
   42l;
@@ -8,5 +8,4 @@ void test() {
   42U;
   42ul;
   42UL;
-
 }

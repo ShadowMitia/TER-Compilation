@@ -106,11 +106,12 @@ l_expr:
     l = separated_list(COMMA, expression) { l }
 ;
 
-expression_:
-   | n = NUM { Econst(Cint32(n))  }
-   | n = UNSIGNED_LONG_NUM { Econst(Cint64(n)) }
-   | n = LONG_NUM { Econst(Cint64(n)) }
-   | n = UNSIGNED_NUM { Econst(Cint32(n)) }
+  expression_:
+   (* Manque le cas du short? *)
+   | n = NUM { Econst(Cint32(Signed, Int, n))  }
+   | n = UNSIGNED_LONG_NUM { Econst(Cint64(Unsigned, Long, n)) }
+   | n = LONG_NUM { Econst(Cint64(Signed, Long, n)) }
+   | n = UNSIGNED_NUM { Econst(Cint32(Unsigned, Int, n)) }
    | n = NUM_FLOAT { Econst(Cdouble(n))     }
    | c = CONST_CHAR { Econst(Cstring(c)) }  (* A CHANGER PROBABLMENT *)
    | c = CONST_STRING { Econst(Cstring(c)) } (* A CHANGER PROBABLEMENT *)
