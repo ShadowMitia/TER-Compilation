@@ -20,7 +20,8 @@ type c_type =
   | Tpointer of c_type
 
 type constant =
-  | Cint of int32
+  | Cint32 of int32
+  | Cint64 of int64
   | Cdouble of float
   | Cstring of string
 

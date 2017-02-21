@@ -21,8 +21,8 @@
 %token <string> IDENT
 %token <int32>  NUM
 %token <int32>  UNSIGNED_NUM
-%token <int32>  UNSIGNED_LONG_NUM
-%token <int32>  LONG_NUM
+%token <int64>  UNSIGNED_LONG_NUM
+%token <int64>  LONG_NUM
 %token <float>  NUM_FLOAT
 %token <string> CONST_STRING
 %token <string> CONST_CHAR
@@ -107,10 +107,10 @@ l_expr:
 ;
 
 expression_:
-   | n = NUM { Econst(Cint(n))  }
-   | n = UNSIGNED_LONG_NUM { Econst(Cint(n)) }
-   | n = LONG_NUM { Econst(Cint(n)) }
-   | n = UNSIGNED_NUM { Econst(Cint(n)) }
+   | n = NUM { Econst(Cint32(n))  }
+   | n = UNSIGNED_LONG_NUM { Econst(Cint64(n)) }
+   | n = LONG_NUM { Econst(Cint64(n)) }
+   | n = UNSIGNED_NUM { Econst(Cint32(n)) }
    | n = NUM_FLOAT { Econst(Cdouble(n))     }
    | c = CONST_CHAR { Econst(Cstring(c)) }  (* A CHANGER PROBABLMENT *)
    | c = CONST_STRING { Econst(Cstring(c)) } (* A CHANGER PROBABLEMENT *)

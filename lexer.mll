@@ -40,6 +40,9 @@
   let int32_of_number_string num ign =
     Int32.of_string (String.sub num 0 ((String.length num) - ign))
 
+  let int64_of_number_string num ign =
+    Int64.of_string (String.sub num 0 ((String.length num) - ign))
+
 }
 
 let digit = ['0'-'9']
@@ -83,16 +86,16 @@ rule token = parse
   | "."              { DOT }
   | "["              { L_SQ_BRACKET }
   | "]"              { R_SQ_BRACKET }
-  | (['-'])? digit+ (['u'] | ['U']) (['l'] | ['L']) { UNSIGNED_LONG_NUM (int32_of_number_string (lexeme lexbuf) 2) }
-  | ['-']? digit+ (['l'] | ['L']) { LONG_NUM (int32_of_number_string (lexeme lexbuf) 1) }
+  | (['-'])? digit+ (['u'] | ['U']) (['l'] | ['L']) { UNSIGNED_LONG_NUM (int64_of_number_string (lexeme lexbuf) 2) }
+  | ['-']? digit+ (['l'] | ['L']) { LONG_NUM (int64_of_number_string (lexeme lexbuf) 1) }
   | digit+ (['u'] | ['U']) { UNSIGNED_NUM (int32_of_number_string (lexeme lexbuf) 1) }
-  | ['-']+ digit+ { NUM (int32_of_number_string (lexeme lexbuf) 0) }
+  | ['-']? digit+ { NUM (int32_of_number_string (lexeme lexbuf) 0) }
   | ['-']? const_float      { NUM_FLOAT (float_of_string (lexeme lexbuf)) }
-  | ['-']? const_char       { CONST_CHAR (lexeme lexbuf) }
-  | ['-']? const_string     { CONST_STRING (lexeme lexbuf)  }
+  | const_string     { CONST_STRING (lexeme lexbuf)  }
   | identifier       { keyword_or_ident(lexeme lexbuf) }
   | "/*"             { comment lexbuf }
   | "#"              { macro lexbuf }
+  | "*/"             { failwith "Error: unmatched comment ending" }
   | _                { char_error (lexeme lexbuf) }
 
 and comment = parse

@@ -1,7 +1,7 @@
 int myfunc();
 void myprocedure() {}
 char myfuncwithargs(int a);
-char myfuncwithargs2(int a, int b);*/
+char myfuncwithargs2(int a, int b);
 /*
 extern void testExtern();
 

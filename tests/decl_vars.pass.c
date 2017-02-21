@@ -1,5 +1,5 @@
 void variable_declarations() {
-  int ii;
+  int i;
   char cc;
   short ss;
   long ll;
