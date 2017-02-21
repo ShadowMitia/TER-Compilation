@@ -20,7 +20,10 @@
 %token EOF
 %token <string> IDENT
 %token <int32>  NUM
-%token <float> NUM_FLOAT
+%token <int32>  UNSIGNED_NUM
+%token <int32>  UNSIGNED_LONG_NUM
+%token <int32>  LONG_NUM
+%token <float>  NUM_FLOAT
 %token <string> CONST_STRING
 %token <string> CONST_CHAR
 
@@ -37,7 +40,6 @@
 %token PLUS MINUS DIV MOD
 %token SIZEOF WHILE FOR IF ELSE RETURN
 %token PLUSPLUS MINUSMINUS
-
 
 /* Priorités */
 
@@ -106,7 +108,12 @@ l_expr:
 
 expression_:
    | n = NUM { Econst(Cint(n))  }
+   | n = UNSIGNED_LONG_NUM { Econst(Cint(n)) }
+   | n = LONG_NUM { Econst(Cint(n)) }
+   | n = UNSIGNED_NUM { Econst(Cint(n)) }
    | n = NUM_FLOAT { Econst(Cdouble(n))     }
+   | c = CONST_CHAR { Econst(Cstring(c)) }  (* A CHANGER PROBABLMENT *)
+   | c = CONST_STRING { Econst(Cstring(c)) } (* A CHANGER PROBABLEMENT *)
    | i = identifier { Eident(i) }
    | STAR expr = expression { Eunop(Deref, expr)  }
    | expr1 = expression L_SQ_BRACKET expr2 = expression R_SQ_BRACKET { Egetarr(expr1, expr2) }
@@ -123,7 +130,7 @@ expression_:
    | SIZEOF LPAR cplxtype = cplx_type RPAR {(Esizeof cplxtype) }
    | LPAR cplxtype = cplx_type RPAR expr = expression { Ecast(cplxtype, expr) }
    | LPAR expr = expression_ RPAR { expr }
-   ;
+;
 
 cplx_type:
    | t = c_type { t }

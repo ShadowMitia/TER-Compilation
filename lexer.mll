@@ -37,13 +37,15 @@
                   ];
     with Not_found -> IDENT s
 
+  let int32_of_number_string num ign =
+    Int32.of_string (String.sub num 0 ((String.length num) - ign))
+
 }
 
 let digit = ['0'-'9']
 let alpha = ['a'-'z' 'A'-'Z']
 let identifier = (alpha | ['_']) (alpha | digit | ['_'])*
-let const_int = (digit+) (['u'] | ['U'])?(['l'] | ['L'])?
-let const_float = (digit+['.']digit* | ['.']digit+)((['e'] | ['E'])['-']?digit+)?
+let const_float = (digit+ ['.'] digit* | ['.']digit+)((['e'] | ['E'])['-']?digit+)?
 let const_char = ([' '-'~']#['\'' '\\' '\"'])
 let const_string = ['\"'] (const_char | [' '] | ['\t'])+ ['\"']
 
@@ -81,14 +83,17 @@ rule token = parse
   | "."              { DOT }
   | "["              { L_SQ_BRACKET }
   | "]"              { R_SQ_BRACKET }
-  | const_int        { NUM (Int32.of_string (lexeme lexbuf)) }
-  | const_float      { NUM_FLOAT (float_of_string (lexeme lexbuf)) }
-  (*| const_char       { CONST_STRING (lexeme lexbuf) }*)
-  | const_string     { CONST_STRING (lexeme lexbuf)  }
+  | (['-'])? digit+ (['u'] | ['U']) (['l'] | ['L']) { UNSIGNED_LONG_NUM (int32_of_number_string (lexeme lexbuf) 2) }
+  | ['-']? digit+ (['l'] | ['L']) { LONG_NUM (int32_of_number_string (lexeme lexbuf) 1) }
+  | digit+ (['u'] | ['U']) { UNSIGNED_NUM (int32_of_number_string (lexeme lexbuf) 1) }
+  | ['-']+ digit+ { NUM (int32_of_number_string (lexeme lexbuf) 0) }
+  | ['-']? const_float      { NUM_FLOAT (float_of_string (lexeme lexbuf)) }
+  | ['-']? const_char       { CONST_CHAR (lexeme lexbuf) }
+  | ['-']? const_string     { CONST_STRING (lexeme lexbuf)  }
   | identifier       { keyword_or_ident(lexeme lexbuf) }
   | "/*"             { comment lexbuf }
   | "#"              { macro lexbuf }
-  | _                { char_error(lexeme lexbuf) }
+  | _                { char_error (lexeme lexbuf) }
 
 and comment = parse
             | "*/" { token lexbuf }
