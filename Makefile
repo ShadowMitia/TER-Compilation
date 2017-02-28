@@ -98,6 +98,7 @@ depend: $(SMLIYL)
 
 -include depend
 
+# Tests unitaires
 
 test:
 #TODO: mieux detecter les valeurs de retours (tester la présence de noms d'exceptions)
@@ -105,5 +106,7 @@ test:
 		echo -n "Testing on " \"$$i\"; \
 		# ./$(EXEC) $$i >/dev/null 2>&1; \
 		./$(EXEC) $$i; \
-		if [[ ("$$?" -ne 0 && "$$i" = *".fail."* )  || ( "$$?" -eq 0 && "$$i" = *".pass."* ) ]]; then echo "	[PASSED]"; else echo "	[FAILED]"; fi \
+		if [[ ("$$?" -ne 0 && "$$i" = *".fail."* ) \
+		|| ( "$$?" -eq 0 && "$$i" = *".pass."* ) ]]; \
+		then echo "	[PASSED]"; else echo "	[FAILED]"; fi \
 	done

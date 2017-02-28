@@ -88,8 +88,8 @@ rule token = parse
   | "]"              { R_SQ_BRACKET }
   | (['-'])? digit+ (['u'] | ['U']) (['l'] | ['L']) { UNSIGNED_LONG_NUM (int64_of_number_string (lexeme lexbuf) 2) }
   | ['-']? digit+ (['l'] | ['L']) { LONG_NUM (int64_of_number_string (lexeme lexbuf) 1) }
-  | digit+ (['u'] | ['U']) { UNSIGNED_NUM (int32_of_number_string (lexeme lexbuf) 1) }
-  | ['-']? digit+ { NUM (int32_of_number_string (lexeme lexbuf) 0) }
+  | digit+ (['u'] | ['U']) { UNSIGNED_NUM (int64_of_number_string (lexeme lexbuf) 1) }
+  | ['-']? digit+ { NUM (int64_of_number_string (lexeme lexbuf) 0) }
   | ['-']? const_float      { NUM_FLOAT (float_of_string (lexeme lexbuf)) }
   | const_string     { CONST_STRING (lexeme lexbuf)  }
   | identifier       { keyword_or_ident(lexeme lexbuf) }

@@ -5,7 +5,7 @@ open Lexing
 open Lexer
 open Parser
 open Ast
-(* open Typing *)
+open Typing
 
 let usage = "usage: compilo [options] file.c"
 
@@ -49,10 +49,13 @@ let () =
 	report_loc (lexeme_start_p lb, lexeme_end_p lb);
 	eprintf "lexical error: %s\n@." s;
 	exit 1
-    | Parsing.Parse_error ->
+    | Parser.Error ->
 	report_loc (lexeme_start_p lb, lexeme_end_p lb);
 	eprintf "syntax error\n@.";
 	exit 1
+    | Typing.TypeError (loc, msg) ->
+       report_loc loc;
+       eprintf "typing error: %s\n@." msg;
     | e ->
 	eprintf "Anomaly: %s\n@." (Printexc.to_string e);
 	exit 2

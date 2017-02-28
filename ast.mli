@@ -10,6 +10,7 @@ type ident = (loc, string) node
 type signedness = Signed | Unsigned
 
 type num_type = Char | Short | Int | Long
+
 type c_type =
   | Tnull (* pour typer null *)
   | Tvoid
@@ -19,8 +20,7 @@ type c_type =
   | Tpointer of c_type
 
 type constant =
-  | Cint32 of signedness * num_type * int32
-  | Cint64 of signedness * num_type * int64
+  | Cint of signedness * num_type * int64
   | Cdouble of float
   | Cstring of string
 
@@ -35,7 +35,7 @@ and 'info expr_node =
   | Esizeof of c_type
   | Ebinop  of 'info expr * binop * 'info expr
   | Eunop   of  unop      * 'info expr
-  | Ecall   of 'info expr * 'info expr list
+  | Ecall   of ident  * 'info expr list
   | Egetarr of 'info expr * 'info expr
   | Eassign of 'info expr * 'info expr
   | Ecast   of c_type     * 'info expr

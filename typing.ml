@@ -44,11 +44,13 @@ let max_type t1 t2 =
   else t1
 
 let num t =
+  (* Vérifie si c'est un numérique (nombre ou pointeur) *)
   match t with
   | Tstruct _ | Tvoid -> false
   | _ -> true
 
 let arith t =
+  (* Vérifie si le nombre est une valeur arithmétique *)
   match t with
   | Tstruct _ | Tvoid | Tpointer _ -> false
   | _ -> true
@@ -60,10 +62,8 @@ let rec type_bf t =
   (* Vérifie si un type est bien formé *)
   match t with
   | Tpointer tt -> type_bf tt
-  | Tstruct id -> Hashtbl.mem struct_env id.node
+  | Tstruct id -> Hashtbl.mem struct_env id.node;
   | _ -> true
-
-;;
 
 let add_global_env tab key v =
   if Hashtbl.mem tab key.node then
@@ -80,17 +80,14 @@ let type_var_decl vd =
     List.fold_left (fun seen (t, id) ->
         if type_bf t && not (List.mem id.node seen) then
           id.node :: seen
-        else error id.info "Champ ou variable incorrect")
-                   []
-	           vd
+        else error id.info "Champ ou variable incorrect") [] vd
   in vd
 
 let type_const c =
   match c with
   | Cstring _ -> Tpointer (Tinteger(Signed, Char))
   | Cdouble _ -> Tdouble
-  (*| Cint(Signed, Int) -> Tnull
-	| Cint() -> Tinteger (s, i) *)
+  | Cint(s, i, _) -> Tinteger (s, i)
   | _ -> assert false
 
 
@@ -99,14 +96,113 @@ let rec type_expr env e =
   | Econst c -> let tc = type_const c in
 		mk_node tc (Econst c)
   | Eunop (unop, e0) ->
-     begin match unop with
-     | Neg -> let  te0 = type_expr env e0 in
-	      if not (arith  te0.info) then
-		error e0.info "Type invalide"
-	      else
-		mk_node te0.info (Eunop(Neg, te0))
-     (*| Deref -> let te0 = type_lvalue env e0 in
-		  assert false*)
+     begin
+       match unop with
+       | Pos ->  let te0 = type_expr env e0 in
+	         if not (num te0.info) then
+		   error e0.info "Type invalide : '+' pas compatible avec"
+	         else
+		   mk_node te0.info (Eunop(Pos, te0))
+       | Neg ->  let te0 = type_expr env e0 in
+	         if not (num te0.info) then
+		   error e0.info "Type invalide : '-' pas compatible avec"
+	         else
+		   mk_node te0.info (Eunop(Neg, te0))
+       | Not -> let te0 = type_expr env e0 in
+	        if not (num te0.info) then
+		  error e0.info "Type invalide : '!' pas compatible avec"
+	        else
+		  mk_node te0.info (Eunop(Not, te0))
+       | Deref -> let te0 = type_lvalue env e0 in
+                  if not (arith te0.info) then
+                    error e0.info "Type invalide - '&' pas compatible avec"
+                  else
+                    mk_node te0.info (Eunop(Deref, te0))
+       (*| Addr ->  let te0 = type_expr env e0 in
+                  if not (arith te0.info) then
+                    error e0.info "Type invalide"
+                  else
+                    mk_node te0 (Eunop(Addr, te0))*)
+       (*| PreInc -> let te0 = type_expr env e0 in
+                   if not (arith te0.info) then
+                     error e0.info "Type invalide"
+                   else
+                     mk_node e0.info (Eunop(PreInc, te0))
+       | PreDec -> let te0 = type_expr env e0 in
+                   if not (arith te0.info) then
+                     error e0.info "Type invalide"
+                   else
+                     mk_node e0.info (Eunop(PreDec, te0))
+       | PostInc -> let te0 = type_expr env e0 in
+                    if not (arith te0.info) then
+                      error e0.info "Type invalide"
+                    else
+                      mk_node e0.info (Eunop(PostInc, te0))
+       | PostDec -> let te0 = type_expr env e0 in
+                    if not (arith te0.info) then
+                      error e0.info "Type invalide"
+                    else
+                      mk_node e0.info (Eunop(PostDec, te0))
+        *)
+     end
+
+  | Ebinop(e1, op, e2) ->
+     begin
+       match op with
+       | Add -> assert false
+       | Mult -> assert false
+       | Minus -> assert false
+       | Div -> assert false
+       | Mod -> assert false
+       | And -> assert false
+       | Or -> assert false
+       | Eq -> assert false
+       | Neq -> assert false
+       | Lt -> assert false
+       | Le -> assert false
+       | Gt -> assert false
+       | Ge -> assert false
+       | Dot ->
+          (*let te0 = type_expr env e1 in
+          begin
+          match te0.info with
+          | Tstruct id -> let fields = Hashtbl.find struct_env id.node in
+                          begin
+                            try
+                              let t, _ = List.find (fun (t, y) -> y.node = e2.node) fields in
+                              let te1 = type_expr env t in
+                              assert false; mk_node te0.info (Ebinop(te0, Dot, te0))
+                            with Not_found -> error e2.info "Champ de structure inconnu"
+                          end
+            | _ -> error e.info "Accès ầ une valeur non structurelle"
+            end
+           *) assert false;
+       | Arrow -> assert false
+     end
+
+  (*| Egetarr (expr1, expr2) -> let  te0 = type_expr env expr1 in
+                              let te1 = type_expr env expr2 in
+                              if not (arith te0.info) then
+                                error expr1.info "Type invalide - liste";
+                              if not (arith te1.info) then
+                                error expr2.info "Type invalide - indice liste";
+                              mk_node te0.info (Egetarr(te0, te1)) *)
+
+  | Ecall (f, params) ->
+     let tparams = List.map (type_expr env) params in
+     begin
+       try
+         let tret, _, args = Hashtbl.find fun_env f.node in
+         try
+           List.iter2 (fun e (t, x) ->
+               if not (compatible e.info t) then
+                 error x.info ("Type invalide pour le paramètre" ^ x.node ^ " de " ^ f.node))
+                      tparams
+                      args;
+           mk_node tret (Ecall(f, tparams))
+         with Invalid_argument _ -> error f.info ("Nombre d'arguments invalide pour " ^ f.node)
+       with
+         Not_found -> error f.info ("La fonction " ^ f.node ^ " n'existe pas")
      end
   | _ -> type_lvalue env e
 
@@ -124,26 +220,43 @@ and type_lvalue env e =
 	 Not_found -> error id.info ("Variable non définie " ^ id.node)
      in
      mk_node t (Eident id)
+  | Ebinop(e1, Dot, e2) -> failwith "lvalue dot"
+  | Eunop(Deref, e) -> failwith "lvalue deref"
   (* Doit gérer ident(fait), acces à un champ et étoile de qlqchose *)
-  | _ -> error e.info "Valeur gauche attendue"
+  | _ -> error e.info "Valeur gauche attendue "
 
-
-let typ_instr ty env i =
+let rec type_instr ty env i =
   match i.node with
   | Sskip -> mk_node Tvoid Sskip
   | Sexpr e -> let te = type_expr env e in
 	       mk_node te.info (Sexpr te)
+  | Sblock (vars, instrs) -> let tb = type_block ty env (vars, instrs) in
+                             mk_node Tvoid (Sblock tb)
+  | Sif (cond, b1, None) -> let te = type_expr env cond in
+                            let tb1 = type_instr ty env b1 in
+                            mk_node te.info (Sif (te, tb1, None))
+  | Sif (cond, b1, Some b2) -> let te = type_expr env cond in
+                               let tb1 = type_instr ty env b1 in
+                               let tb2 = type_instr ty env b2 in
+                               mk_node te.info (Sif (te, tb1, Some tb2))
+  | Swhile (cond, b) -> let te = type_expr env cond in
+                        let tb = type_instr ty env b in
+                        mk_node te.info (Swhile (te, tb))
+  | Sreturn None -> mk_node Tvoid (Sreturn None)
+  | Sreturn (Some b) -> let tb = type_expr env b in
+                        mk_node tb.info (Sreturn (Some tb))
 
-let type_block t env (var_decl, instrs) =
-  (type_var_decl var_decl,
-   let new_env = add_env env var_decl in
-   List.map (typ_instr t new_env) instrs)
+and type_block t env (var_decl, instrs) =
+  let new_env = add_env env var_decl in
+  let tvd = type_var_decl var_decl in
+  let ti = List.map (type_instr t new_env) instrs in
+  (tvd, ti)
+
 
 let type_decl d =
   match d with
   | Dvar (t, i) -> if type_bf t && t <> Tvoid then
-                     add_global_env global_env i t;
-		   Dvar (t, i)
+                     add_global_env global_env i t; Dvar (t, i)
 
   | Dstruct (id, var_decl) ->
      add_global_env struct_env id var_decl;
@@ -165,4 +278,4 @@ let type_decl d =
        end
 
 let type_prog l =
-  List.map (type_decl) l
+  print_int (List.length l); List.map (type_decl) l
