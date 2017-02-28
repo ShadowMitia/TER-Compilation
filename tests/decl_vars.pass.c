@@ -1,10 +1,9 @@
 void variable_declarations() {
   int i;
-  char cc;
-  short ss;
-  long ll;
-  void vv;
-  double dd;
+  char c;
+  short s;
+  long l;
+  double d;
   unsigned int ii;
   unsigned char cc;
   unsigned short ss;
