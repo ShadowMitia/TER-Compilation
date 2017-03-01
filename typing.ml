@@ -198,7 +198,7 @@ let rec type_expr env e =
            else if type_eq t1 unsigned_int then te1, mk_cast unsigned_int te2
            else if type_eq t2 unsigned_int then mk_cast unsigned_int te1, te2
            else te1, te2
-           
+
        else
          te1, te2 in
      begin
@@ -304,9 +304,11 @@ let rec type_instr ty env i =
                                let tb1 = type_instr ty env b1 in
                                let tb2 = type_instr ty env b2 in
                                mk_node te.info (Sif (te, tb1, Some tb2))
-  | Swhile (cond, b) -> let te = type_expr env cond in
+  | Sfor (e1, cond, e2, b) -> let te1 = type_expr env cond in
+                        let te2 = type_expr env cond in
+                        let te3 = type_expr env cond in
                         let tb = type_instr ty env b in
-                        mk_node te.info (Swhile (te, tb))
+                        mk_node te.info (Sfor (te1, te2, te3, tb))
   | Sreturn None -> mk_node Tvoid (Sreturn None)
   | Sreturn (Some b) -> let tb = type_expr env b in
                         mk_node tb.info (Sreturn (Some tb))
