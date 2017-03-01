@@ -120,61 +120,61 @@ let type_const c =
   | _ -> assert false
 
 
+       (* A VERIFIER: les ariths et nums de chaque cas *)
 let rec type_expr env e =
   match e.node with
   | Econst c -> let tc = type_const c in
 		mk_node tc (Econst c)
   | Eunop (unop, e0) ->
      begin
+       let te0 = type_expr env e0 in
        match unop with
-       | Pos ->  let te0 = type_expr env e0 in
+       | Pos ->
 	         if not (num te0.info) then
 		   error e0.info "Type invalide : '+' pas compatible avec"
 	         else
 		   mk_node te0.info (Eunop(Pos, te0))
-       | Neg ->  let te0 = type_expr env e0 in
+       | Neg ->
 	         if not (num te0.info) then
 		   error e0.info "Type invalide : '-' pas compatible avec"
 	         else
 		   mk_node te0.info (Eunop(Neg, te0))
-       | Not -> let te0 = type_expr env e0 in
+       | Not ->
 	        if not (num te0.info) then
 		  error e0.info "Type invalide : '!' pas compatible avec"
 	        else
 		  mk_node te0.info (Eunop(Not, te0))
-       | Deref -> let te0 = type_lvalue env e0 in
+       | Deref ->
                   if not (arith te0.info) then
                     error e0.info "Type invalide - '&' pas compatible avec"
                   else
                     mk_node te0.info (Eunop(Deref, te0))
-       (*| Addr ->  let te0 = type_expr env e0 in
+       | Addr ->
                   if not (arith te0.info) then
                     error e0.info "Type invalide"
                   else
-                    mk_node te0 (Eunop(Addr, te0))*)
-       (*| PreInc -> let te0 = type_expr env e0 in
+                    mk_node te0.info (Eunop(Addr, te0))
+       | PreInc ->
                    if not (arith te0.info) then
                      error e0.info "Type invalide"
                    else
-                     mk_node e0.info (Eunop(PreInc, te0))
-       | PreDec -> let te0 = type_expr env e0 in
+                     mk_node te0.info (Eunop(PreInc, te0))
+       | PreDec ->
                    if not (arith te0.info) then
                      error e0.info "Type invalide"
                    else
-                     mk_node e0.info (Eunop(PreDec, te0))
-       | PostInc -> let te0 = type_expr env e0 in
+                     mk_node te0.info (Eunop(PreDec, te0))
+       | PostInc ->
                     if not (arith te0.info) then
                       error e0.info "Type invalide"
                     else
-                      mk_node e0.info (Eunop(PostInc, te0))
-       | PostDec -> let te0 = type_expr env e0 in
+                      mk_node te0.info (Eunop(PostInc, te0))
+       | PostDec ->
                     if not (arith te0.info) then
                       error e0.info "Type invalide"
                     else
-                      mk_node e0.info (Eunop(PostDec, te0))
-        *)
+                      mk_node te0.info (Eunop(PostDec, te0))
      end
-
   | Ebinop(e1, op, e2) ->
      let te1 = type_expr env e1 in
      let te2 = type_expr env e2 in
@@ -198,39 +198,36 @@ let rec type_expr env e =
            else if type_eq t1 unsigned_int then te1, mk_cast unsigned_int te2
            else if type_eq t2 unsigned_int then mk_cast unsigned_int te1, te2
            else te1, te2
-           
        else
          te1, te2 in
      begin
        match op with
-       | Add -> assert false
-       | Mult -> assert false
-       | Minus -> assert false
-       | Div -> assert false
-       | Mod -> assert false
-       | And -> assert false
-       | Or -> assert false
-       | Eq -> assert false
-       | Neq -> assert false
-       | Lt -> assert false
-       | Le -> assert false
-       | Gt -> assert false
-       | Ge -> assert false
-       | Dot ->
-          (*let te0 = type_expr env e1 in
-          begin
-          match te0.info with
-          | Tstruct id -> let fields = Hashtbl.find struct_env id.node in
-                          begin
-                            try
-                              let t, _ = List.find (fun (t, y) -> y.node = e2.node) fields in
-                              let te1 = type_expr env t in
-                              assert false; mk_node te0.info (Ebinop(te0, Dot, te0))
-                            with Not_found -> error e2.info "Champ de structure inconnu"
-                          end
+       | Add -> mk_node nte1.info (Ebinop(nte1, Add, nte2))
+       | Mult -> mk_node nte1.info (Ebinop(nte1, Mult, nte2))
+       | Minus -> mk_node nte1.info (Ebinop(nte1, Minus, nte2))
+       | Div -> mk_node nte1.info (Ebinop(nte1, Minus, nte2))
+       | Mod -> mk_node nte1.info (Ebinop(nte1, Mod, nte2))
+       | And -> mk_node nte1.info (Ebinop(nte1, And, nte2))
+       | Or -> mk_node nte1.info (Ebinop(nte1, Or, nte2))
+       | Eq -> mk_node nte1.info (Ebinop(nte1, Eq, nte2))
+       | Neq -> mk_node nte1.info (Ebinop(nte1, Neq, nte2))
+       | Lt -> mk_node nte1.info (Ebinop(nte1, Lt, nte2))
+       | Le -> mk_node nte1.info (Ebinop(nte1, Le, nte2))
+       | Gt -> mk_node nte1.info (Ebinop(nte1, Gt, nte2))
+       | Ge -> mk_node nte1.info (Ebinop(nte1, Ge, nte2))
+       | Dot -> mk_node nte1.info (Ebinop(nte1, Dot, nte2))
+          (*begin
+            match t1 with
+            | Tstruct id -> let fields = Hashtbl.find struct_env id.node in
+                            begin
+                              try
+                                let t, _ = List.find (fun (t, y) -> y.node = e2.node) fields in
+                                let te2 = type_expr env t in
+                                mk_node nte1.info (Ebinop(nte1, Dot, te2))
+                              with Not_found -> error e2.info "Champ de structure inconnu"
+                            end
             | _ -> error e.info "Accès ầ une valeur non structurelle"
-            end
-           *) assert false;
+          end*)
        | Arrow -> assert false
      end
 
@@ -287,7 +284,6 @@ and type_lvalue env e =
      mk_node t (Eident id)
   | Ebinop(e1, Dot, e2) -> failwith "lvalue dot"
   | Eunop(Deref, e) -> failwith "lvalue deref"
-  (* Doit gérer ident(fait), acces à un champ et étoile de qlqchose *)
   | _ -> error e.info "Valeur gauche attendue "
 
 let rec type_instr ty env i =

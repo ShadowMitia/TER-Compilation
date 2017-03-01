@@ -11,9 +11,24 @@ int test(int a, int b, int c) {
   return 42;
 }
 
+int test2() {
+  1 + 1;
+  1 - 1;
+  1/1;
+  1*1;
+  1&&1;
+  1||1;
+  1!=1;
+  1<1;
+  1>1;
+  1<=1;
+  1>=1;
+}
+
+/*
 void test2() {
   int* test;
-  /*test;*/
+  test;
   test[0];
   return;
 }
@@ -55,3 +70,4 @@ void test3() {
   (void)t1;
   (t1);
 }
+*/
