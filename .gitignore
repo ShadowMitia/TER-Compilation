@@ -11,3 +11,4 @@ parser.mli
 minic
 minic.opt
 depend
+*.s
