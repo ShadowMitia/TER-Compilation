@@ -215,7 +215,7 @@ let rec type_expr env e =
        | Le -> mk_node nte1.info (Ebinop(nte1, Le, nte2))
        | Gt -> mk_node nte1.info (Ebinop(nte1, Gt, nte2))
        | Ge -> mk_node nte1.info (Ebinop(nte1, Ge, nte2))
-       | Dot -> mk_node nte1.info (Ebinop(nte1, Dot, nte2))
+       | Dot -> (*mk_node nte1.info (Ebinop(nte1, Dot, nte2))*)
           (*begin
             match t1 with
             | Tstruct id -> let fields = Hashtbl.find struct_env id.node in
@@ -227,7 +227,7 @@ let rec type_expr env e =
                               with Not_found -> error e2.info "Champ de structure inconnu"
                             end
             | _ -> error e.info "Accès ầ une valeur non structurelle"
-          end*)
+          end*) assert false
        | Arrow -> assert false
      end
 
@@ -300,11 +300,11 @@ let rec type_instr ty env i =
                                let tb1 = type_instr ty env b1 in
                                let tb2 = type_instr ty env b2 in
                                mk_node te.info (Sif (te, tb1, Some tb2))
-  | Sfor (e1, cond, e2, b) -> let te1 = type_expr env cond in
+  (*| Sfor (e1, cond, e2, b) -> let te1 = type_expr env e1 in
                         let te2 = type_expr env cond in
-                        let te3 = type_expr env cond in
+                        let te3 = type_expr env e2 in
                         let tb = type_instr ty env b in
-                        mk_node te.info (Sfor (te1, te2, te3, tb))
+                        mk_node te.info (Sfor (te1, te2, te3, tb))*)
   | Sreturn None -> mk_node Tvoid (Sreturn None)
   | Sreturn (Some b) -> let tb = type_expr env b in
                         mk_node tb.info (Sreturn (Some tb))
