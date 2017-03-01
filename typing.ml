@@ -8,6 +8,7 @@ let fun_env = Hashtbl.create 17
 
 let mk_node t e = { info = t; node = e }
 
+
 let compatible t1 t2 =
   (* Vérifie si deux types sont compatibles entre eux *)
   let rec compat_aux t1 t2 =
@@ -21,6 +22,34 @@ let compatible t1 t2 =
   in
   compat_aux t1 t2 || compat_aux t2 t1
 
+let rec type_eq t1 t2 =
+  match t1, t2 with
+  | Tnull, Tnull
+  | Tvoid, Tvoid
+  | Tdouble, Tdouble -> true
+  | Tinteger(s1, k1), Tinteger(s2, k2) -> s1 = s2 && k1 = k2
+  | Tstruct id1, Tstruct id2 -> id1.node = id2.node
+  | Tpointer p1, Tpointer p2 -> type_eq p1 p2
+  | _ -> false
+
+(* input: type et expression *)
+let mk_cast t e =
+  if not (compatible t e.info) then
+    assert false
+  else
+    mk_node t (Ecast(t, e))
+
+let num t =
+  (* Vérifie si c'est un numérique (nombre ou pointeur) *)
+  match t with
+  | Tstruct _ | Tvoid -> false
+  | _ -> true
+
+let arith t =
+  (* Vérifie si le nombre est une valeur arithmétique *)
+  match t with
+  | Tstruct _ | Tvoid | Tpointer _ -> false
+  | _ -> true
 
 let rank t =
   let rank_aux n = match n with
@@ -36,24 +65,24 @@ let rank t =
   | Tnull -> 0
   | _ -> assert false
 
-let inf_type t1 t2 =
-  rank t1 < rank t2
+let type_lt t1 t2 =
+  arith t1 && arith t2 && (rank t1) < (rank t2)
+
+let type_lte t1 t2 =
+  type_lt t1 t2 || type_eq t1 t2
 
 let max_type t1 t2 =
-  if inf_type t1 t2 then t2
+  if type_lt t1 t2 then t2
   else t1
 
-let num t =
-  (* Vérifie si c'est un numérique (nombre ou pointeur) *)
+let signed_int = Tinteger(Signed, Int)
+let unsigned_int = Tinteger(Unsigned, Int)
+let signed_long = Tinteger(Signed, Long)
+let unsigned_long = Tinteger(Unsigned, Long)
+let is_double t =
   match t with
-  | Tstruct _ | Tvoid -> false
-  | _ -> true
-
-let arith t =
-  (* Vérifie si le nombre est une valeur arithmétique *)
-  match t with
-  | Tstruct _ | Tvoid | Tpointer _ -> false
-  | _ -> true
+  | Tdouble -> true
+  | _ -> false
 
 exception TypeError of loc * string
 let error loc msg = raise (TypeError (loc, msg))
@@ -147,6 +176,31 @@ let rec type_expr env e =
      end
 
   | Ebinop(e1, op, e2) ->
+     let te1 = type_expr env e1 in
+     let te2 = type_expr env e2 in
+     let t1 = te1.info in
+     let t2 = te2.info in
+     let nte1, nte2 =
+       if arith t1 && arith t2 && not (type_eq t1 t2) then
+         if is_double t1 then
+           te1, mk_cast Tdouble te2
+         else if is_double t2 then
+           mk_cast Tdouble te1, te2
+         else
+           let te1 = if type_lt t1 signed_int then mk_cast signed_int te1 else te1 in
+           let te2 = if type_lt t2 signed_int then mk_cast signed_int te2 else te2 in
+           let t1 = te1.info in
+           let t2 = te2.info in
+           if type_eq t1 unsigned_long then te1, mk_cast unsigned_long te2
+           else if type_eq t2 unsigned_long then mk_cast unsigned_long te1, te2
+           else if type_eq t1 signed_long then te1, mk_cast signed_long te2
+           else if type_eq t2 signed_long then mk_cast signed_long te1, te2
+           else if type_eq t1 unsigned_int then te1, mk_cast unsigned_int te2
+           else if type_eq t2 unsigned_int then mk_cast unsigned_int te1, te2
+           else te1, te2
+           
+       else
+         te1, te2 in
      begin
        match op with
        | Add -> assert false
@@ -192,18 +246,29 @@ let rec type_expr env e =
      let tparams = List.map (type_expr env) params in
      begin
        try
-         let tret, _, args = Hashtbl.find fun_env f.node in
+         let tret, _, args, _ = Hashtbl.find fun_env f.node in
          try
-           List.iter2 (fun e (t, x) ->
-               if not (compatible e.info t) then
-                 error x.info ("Type invalide pour le paramètre" ^ x.node ^ " de " ^ f.node))
-                      tparams
-                      args;
+           let new_params =
+             List.map2 (fun e (t, x) ->
+                 if not (compatible e.info t) then
+                   error x.info ("Type invalide pour le paramètre" ^ x.node ^ " de " ^ f.node)
+                 else
+                   mk_cast t e
+               )
+                       tparams
+                       args;
+           in
            mk_node tret (Ecall(f, tparams))
          with Invalid_argument _ -> error f.info ("Nombre d'arguments invalide pour " ^ f.node)
-       with
-         Not_found -> error f.info ("La fonction " ^ f.node ^ " n'existe pas")
+       with Not_found -> error f.info ("La fonction " ^ f.node ^ " n'existe pas")
      end
+  | Eassign (e1, e2) ->
+     let te1 = type_lvalue env e1 in
+     let te2 = type_expr env e2 in
+     if not (compatible te1.info te2.info) then
+       error e1.info "Type incompatible pour l'affectation"
+     else
+       mk_node te1.info (Eassign(te1, mk_cast te1.info te2))
   | _ -> type_lvalue env e
 
 and type_lvalue env e =
@@ -266,7 +331,7 @@ let type_decl d =
   | Dfun (t, f, params, b) ->
      if not (type_bf t) then error f.info "Type de retour invalide"
      else begin
-	 add_global_env fun_env f (t, f, params);
+	 add_global_env fun_env f (t, f, params, b = None);
 	 let t_params = type_var_decl params in
 	 let t_block = match b with
 	   | None -> None
