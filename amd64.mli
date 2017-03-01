@@ -267,7 +267,7 @@ val movb: [< [ `b ] source ] operand -> [< [ `b ] dest ] operand -> text
 val movw: [< [ `w ] source ] operand -> [< [ `w ] dest ] operand -> text
 val movl: [< [ `l ] source ] operand -> [< [ `l ] dest ] operand -> text
 val movq: [< [< `q | `d ] source ] operand -> [< [< `q | `d ] dest ] operand -> text
-val mov: [< ([ `b | `w | `l | `q ] as 'a) source ] operand -> [< 'a dest ] operand -> text
+val mov: [< ([< `b | `w | `l | `q ] as 'a) source ] operand -> [< 'a dest ] operand -> text
 
 (** attention, au plus un argument de type adresse.
 *)
