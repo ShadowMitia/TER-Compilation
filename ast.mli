@@ -48,7 +48,7 @@ and 'info statement_node =
   | Sexpr   of ('info expr)
   | Sblock  of ('info block)
   | Sif     of ('info expr) * ('info statement) * ('info statement) option
-  | Sfor	of ('info expr list) * ('info expr option) * ('info expr list) * ('info statement)
+  | Sfor    of ('info expr list) option * ('info expr option) * ('info expr list) option * ('info statement)
   | Sreturn of ('info expr) option
 
 and 'info block =

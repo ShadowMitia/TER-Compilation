@@ -86,8 +86,8 @@ instruction_:
    | expr = expression { Sexpr expr }
    | IF LPAR expr = expression RPAR instr = instruction { Sif(expr, instr, None) }
    | IF LPAR expr = expression RPAR instr1 = instruction ELSE instr2 = instruction { Sif(expr, instr1, Some instr2) }
-   | WHILE LPAR cond = expression RPAR instr = instruction { Sfor([], Some cond, [], instr) }
-   | FOR LPAR expr1 = list(expression) SEMI cond = expression SEMI RPAR expr2 = list(expression) instr = instruction { Sfor(expr1, Some cond, expr2, instr) }
+   | WHILE LPAR cond = expression RPAR instr = instruction { Sfor(None, Some cond, None, instr) }
+   | FOR LPAR expr1 = l_expr SEMI cond = expression SEMI RPAR expr2 = l_expr instr = instruction { Sfor(Some expr1, Some cond, Some expr2, instr) }
    | b = block { Sblock b }
    | RETURN expr = expression SEMI { Sreturn (Some expr) }
    | RETURN SEMI { Sreturn None }
