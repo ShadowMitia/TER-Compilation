@@ -28,7 +28,7 @@
                    "unsigned", UNSIGNED;
                    "struct", STRUCT;
                    "extern", EXTERN;
-		           "sizeof", SIZEOF;
+		   "sizeof", SIZEOF;
                    "if", IF;
                    "else", ELSE;
                    "while", WHILE;
@@ -105,5 +105,5 @@ and comment = parse
             | eof  { failwith "Lexical error : unterminated comment" }
 
 and macro = parse
-          | _    { macro lexbuf }
-          | ['\r' '\n']+ { token lexbuf }
+          | _             { macro lexbuf }
+          | ['\r' '\n']+  { token lexbuf }

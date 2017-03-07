@@ -42,6 +42,23 @@
 
 /* Priorités */
 
+(*
+
+opérateur                                associativité précédence
+-----------------------------------------------------------------
+=                                        à droite      faible
+||                                       à gauche
+&&                                       à gauche
+== !=                                    à gauche
+<   <=   >   >=                          à gauche      ↓
++   -                                    à gauche
+*   /   %                                à gauche
+! ++ -- & *(unaire) +(unaire) -(unaire)  à droite
+)   [   ->   .                           à gauche      forte
+
+*)
+
+
 %right ASSIGN
 %left OR
 %left AND
@@ -49,8 +66,10 @@
 %left LT LTE GT GTE
 %left PLUS MINUS
 %left STAR DIV MOD
-%left NOT PLUSPLUS MINUSMINUS
-%right RPAR LBRACKET ARROW DOT
+%right NOT PLUSPLUS MINUSMINUS BAND USTAR UPLUS UMINUS
+%left RPAR LBRACKET ARROW DOT
+%nonassoc REDUCE (* Ref: http://docs.oracle.com/cd/E19504-01/802-5880/6i9k05dh3/index.html *)
+%nonassoc ELSE
 
 /* Point d'entrée */
 
@@ -84,8 +103,8 @@ block:
 instruction_:
    | SEMI { Sskip }
    | expr = expression { Sexpr expr }
-   | IF LPAR expr = expression RPAR instr = instruction { Sif(expr, instr, None) }
    | IF LPAR expr = expression RPAR instr1 = instruction ELSE instr2 = instruction { Sif(expr, instr1, Some instr2) }
+   | IF LPAR expr = expression RPAR instr = instruction %prec REDUCE { Sif(expr, instr, None) }
    | WHILE LPAR cond = expression RPAR instr = instruction { Sfor(None, Some cond, None, instr) }
    | FOR LPAR expr1 = l_expr SEMI cond = expression SEMI RPAR expr2 = l_expr instr = instruction { Sfor(Some expr1, Some cond, Some expr2, instr) }
    | b = block { Sblock b }
@@ -101,17 +120,17 @@ l_expr:
     l = separated_list(COMMA, expression) { l }
 ;
 
-  expression_:
+expression_:
    (* Manque le cas du short? *)
-   | n = NUM { Econst(Cint(Signed, Int, n))  }
+   | n = NUM { Econst(Cint(Signed, Int, n)) }
    | n = UNSIGNED_LONG_NUM { Econst(Cint(Unsigned, Long, n)) }
    | n = LONG_NUM { Econst(Cint(Signed, Long, n)) }
    | n = UNSIGNED_NUM { Econst(Cint(Unsigned, Int, n)) }
-   | n = NUM_FLOAT { Econst(Cdouble(n))     }
+   | n = NUM_FLOAT { Econst(Cdouble(n)) }
    | c = CONST_CHAR { Econst(Cstring(c)) }  (* A CHANGER PROBABLMENT *)
    | c = CONST_STRING { Econst(Cstring(c)) } (* A CHANGER PROBABLEMENT *)
    | i = identifier { Eident(i) }
-   | STAR expr = expression { Eunop(Deref, expr)  }
+   | STAR expr = expression %prec USTAR { Eunop(Deref, expr) }
    | expr1 = expression L_SQ_BRACKET expr2 = expression R_SQ_BRACKET { Eunop(Deref, mk_loc (Ebinop(expr1, Add, expr2))  ($startpos, $endpos) ) }
    | expr = expression DOT id = identifier SEMI { Ebinop(expr, Dot, mk_loc (Eident id) id.info) }
    | expr = expression ARROW id = identifier SEMI { (Ebinop(mk_loc (Eunop (Deref, expr)) expr.info, Dot, mk_loc (Eident id) id.info )) }
@@ -122,6 +141,8 @@ l_expr:
    | expr = expression PLUSPLUS { Eunop(PostInc, expr) }
    | expr = expression MINUSMINUS { Eunop(PostDec, expr) }
    | uop = unop expr = expression { Eunop(uop, expr) }
+   | MINUS expr = expression %prec UMINUS { Eunop(Neg, expr) }
+   | PLUS  expr = expression %prec UPLUS  { Eunop(Pos, expr) }
    | expr1 = expression op = binop expr2 = expression { Ebinop(expr1, op, expr2) }
    | SIZEOF LPAR cplxtype = cplx_type RPAR {(Esizeof cplxtype) }
    | LPAR cplxtype = cplx_type RPAR expr = expression { Ecast(cplxtype, expr) }
@@ -154,7 +175,7 @@ c_type:
 
 identifier:
    |   i = IDENT { mk_loc i ($startpos, $endpos) }
-   ;
+;
 
 signedness:
    |          { Signed }
@@ -170,14 +191,11 @@ c_int_type:
     | SHORT { Short }
     | INT   { Int }
     | LONG  { Long }
-    ;
+;
 
 %inline unop:
-    | MINUS { Neg }
-    | BAND  { Addr }
-    | PLUS  { Pos }
-    | NOT   { Not }
-    | STAR  { Deref }
+    | BAND   { Addr }
+    | NOT    { Not }
 ;
 
 %inline binop:
