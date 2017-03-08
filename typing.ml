@@ -8,7 +8,6 @@ let fun_env = Hashtbl.create 17
 
 let mk_node t e = { info = t; node = e }
 
-
 let compatible t1 t2 =
   (* Vérifie si deux types sont compatibles entre eux *)
   let rec compat_aux t1 t2 =
@@ -79,12 +78,14 @@ let signed_int = Tinteger(Signed, Int)
 let unsigned_int = Tinteger(Unsigned, Int)
 let signed_long = Tinteger(Signed, Long)
 let unsigned_long = Tinteger(Unsigned, Long)
+
 let is_double t =
   match t with
   | Tdouble -> true
   | _ -> false
 
 exception TypeError of loc * string
+
 let error loc msg = raise (TypeError (loc, msg))
 
 let rec type_bf t =
@@ -119,8 +120,8 @@ let type_const c =
   | Cint(s, i, _) -> Tinteger (s, i)
   | _ -> assert false
 
-
-       (* A VERIFIER: les ariths et nums de chaque cas *)
+(* A VERIFIER: les ariths et nums de chaque cas *)
+(* TODO: finir les messages d'erreurs *)
 let rec type_expr env e =
   match e.node with
   | Econst c -> let tc = type_const c in
@@ -175,6 +176,8 @@ let rec type_expr env e =
                     else
                       mk_node te0.info (Eunop(PostDec, te0))
      end
+  | Ebinop (e1, Dot, e2) -> type_struct_access env e1 e2
+  | Ebinop (e1, Arrow, e2) -> type_struct_access env e1 e2
   | Ebinop(e1, op, e2) ->
      let te1 = type_expr env e1 in
      let te2 = type_expr env e2 in
@@ -215,19 +218,7 @@ let rec type_expr env e =
        | Le -> mk_node nte1.info (Ebinop(nte1, Le, nte2))
        | Gt -> mk_node nte1.info (Ebinop(nte1, Gt, nte2))
        | Ge -> mk_node nte1.info (Ebinop(nte1, Ge, nte2))
-       | Dot -> (*mk_node nte1.info (Ebinop(nte1, Dot, nte2))*)
-          (*begin
-            match t1 with
-            | Tstruct id -> let fields = Hashtbl.find struct_env id.node in
-                            begin
-                              try
-                                let t, _ = List.find (fun (t, y) -> y.node = e2.node) fields in
-                                let te2 = type_expr env t in
-                                mk_node nte1.info (Ebinop(nte1, Dot, te2))
-                              with Not_found -> error e2.info "Champ de structure inconnu"
-                            end
-            | _ -> error e.info "Accès ầ une valeur non structurelle"
-          end*) assert false
+       | Dot -> assert false (* Dois jamais arrivé *)
        | Arrow -> assert false
      end
 
@@ -282,9 +273,25 @@ and type_lvalue env e =
 	 Not_found -> error id.info ("Variable non définie " ^ id.node)
      in
      mk_node t (Eident id)
-  | Ebinop(e1, Dot, e2) -> failwith "lvalue dot"
+  | Ebinop(e1, Dot, e2) -> type_struct_access env e1 e2
   | Eunop(Deref, e) -> failwith "lvalue deref"
   | _ -> error e.info "Valeur gauche attendue "
+
+and type_struct_access env s iden =
+  let var_ident = match iden.node with
+    | Eident i -> i
+    | _ -> assert false in
+  let t_struct = type_expr env s in
+  match t_struct.info with
+  | Tstruct id ->
+     try
+       let fields = Hashtbl.find struct_env id.node in
+       try
+         let t, i = List.find (fun (t, i) -> i.node = var_ident.node) fields in
+         mk_node t (Ebinop(t_struct, Dot, mk_node t (Eident var_ident)))
+         with Not_found -> error iden.info ("Champ invalide " ^ var_ident.node)
+        with Not_found -> error id.info ("Structure non définie " ^ id.node)
+  | _ -> error s.info ("Accès à un champ non structure")
 
 let rec type_instr ty env i =
   match i.node with
@@ -346,4 +353,5 @@ let type_decl d =
        end
 
 let type_prog l =
-  print_int (List.length l); List.map (type_decl) l
+  print_int (List.length l); List.map (type_decl) l;
+  (*Helpers.print_fun_env fun_env*)

@@ -133,7 +133,8 @@ expression_:
    | STAR expr = expression %prec USTAR { Eunop(Deref, expr) }
    | expr1 = expression L_SQ_BRACKET expr2 = expression R_SQ_BRACKET { Eunop(Deref, mk_loc (Ebinop(expr1, Add, expr2))  ($startpos, $endpos) ) }
    | expr = expression DOT id = identifier SEMI { Ebinop(expr, Dot, mk_loc (Eident id) id.info) }
-   | expr = expression ARROW id = identifier SEMI { (Ebinop(mk_loc (Eunop (Deref, expr)) expr.info, Dot, mk_loc (Eident id) id.info )) }
+   (*| expr = expression ARROW id = identifier SEMI { (Ebinop(mk_loc (Eunop (Deref, expr)) expr.info, Dot, mk_loc (Eident id) id.info )) }*)
+   | expr = expression ARROW id = identifier SEMI { (Ebinop(expr, Dot, mk_loc (Eident id) id.info )) }
    | expr1 = expression ASSIGN expr2 = expression { Eassign(expr1, expr2) }
    | i = identifier LPAR lexpr = l_expr RPAR   { Ecall( i, lexpr)  }
    | PLUSPLUS expr = expression { Eunop(PreInc, expr) }
