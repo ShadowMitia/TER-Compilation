@@ -47,7 +47,7 @@ let rcx_  : ( [< `b | `w | `l | `q ] as 'a) -> 'a register = function
 let dl : [ `b ] register = "%dl"
 let dh : [ `b ] register = "%dh"
 let dx : [ `w ] register = "%dx"
-let edx : [ `l ] register = "%dcx"
+let edx : [ `l ] register = "%edx"
 let rdx : [ `q ] register = "%rdx"
 
 let rdx_  : ( [< `b | `w | `l | `q ] as 'a) -> 'a register = function
@@ -824,7 +824,7 @@ let sqrtsd (src : [< `reg of [ `d ] | `address ] operand)
   ins "sqrtsd %s, %s" src dst
 
 let ucomisd (s1 : [< `reg of [ `d ] | `address ] operand) (s2: [< `reg of [ `d ] | `address ] operand) : text =
-  ins "sqrtsd %s, %s" s1 s2
+  ins "ucomisd %s, %s" s1 s2
 
 
 let comment s = S ("#" ^ s ^ "\n")
