@@ -2,6 +2,20 @@ open Ast
 open Amd64
 open Typing
 
+let string_env = Hashtbl.create 17
+
+let int_registers = [rdi; rsi; rdx; rcx; r8; r9]
+
+let new_label =
+  let c = ref 0 in
+  fun s -> incr c; Printf.sprintf "__label__%s_%05i" s !c
+
+let rec fold2 f acc l1 l2 =
+	match l1, l2 with
+	| [], _ -> acc
+	| _,[] -> failwith "fold2"
+	| x1::ll1, x2::ll2 -> fold2 f(f acc x1 x2) ll1 ll2
+
 let size_of t =
     match t with
     | Tvoid | Tnull -> assert false
@@ -25,8 +39,25 @@ let compile_const c =
         movl ~$(Int64.to_int i) ~%r10d
     | Cint (_, _, i) ->
         movabsq (Int64.to_string i) ~%r10
-    | Cstring s -> assert false
-    | Cdouble d -> assert false
+    | Cstring s ->
+		let label =
+			try
+				Hashtbl.find string_env s
+			with Not_found ->
+				let lab = new_label "string" in
+				Hashtbl.add string_env s lab;
+				lab
+		in
+		mov ~:label ~%r10
+	| Cdouble d ->
+		failwith("todo")
+
+let reg_size_of t =
+	match size_of t with
+	| 1 -> `b
+	| 2 -> `w
+	| 4 -> `l
+	| _ -> `q
 
 (* cast la valeur dans r10 de type tfrom en type tto *)
 let compile_cast tfrom tto =
@@ -51,7 +82,7 @@ let compile_cast tfrom tto =
     | Tinteger (Unsigned, Short), Tinteger(_, Long) -> movzwq ~%r10w ~%r10
     | Tinteger (Signed, Int), Tinteger(_, Long) -> movslq ~%r10d ~%r10
     | Tinteger (Unsigned, Int), Tinteger(_, Long) -> andq ~$0xffffffff ~%r10
-    | _ -> assert false
+    | _ -> failwith ("Error type")
 
 let rec compile_expr_reg env e =
     match e.node with
@@ -59,9 +90,66 @@ let rec compile_expr_reg env e =
     | Ecast (t, e0) ->
         compile_expr_reg env e0
         ++ compile_cast e0.info t
-    | _ -> failwith "todo"
+    | Eident _ | Eunop(Deref, _) | Egetarr _ ->
+		let reg10 = r10_ (reg_size_of e.info) in
+		compile_lvalue_reg env e ++
+		mov (addr ~%r10) ~%reg10
+	| Eunop(Addr, e) ->
+		compile_lvalue_reg env e
+	| Eassign (e1, e2) ->
+		let e1_code = compile_lvalue_reg env e1 in
+		let e2_code = compile_expr env e2 in
+		let reg = r11_ (reg_size_of e1.info) in
+		e2_code ++
+		e1_code ++
+		popq ~%r11 ++
+		mov ~%reg (addr ~%r10)++
+		movq ~%r11 ~%r10
+	| Ebinop(binop, e1, e2)	-> assert false
+	| Eunop (unop , e0) ->failwith "todo unop"
+	| Ecall (f, params) ->
+		let tret,_,_, extern = Hashtbl.find fun_env f.node in
+		if extern then
+			let arg_code = fold2 (fun (a_code) e r ->
+				a_code++
+				compile_expr env e ++
+				popq ~%r
+			) nop params int_registers
+			in
+			arg_code ++
+			xorq ~%rax ~%rax++
+			call f.node ++
+			mov ~%rax ~%r10
+		else
+			let size_ret = round8 (size_of tret) in
+		let arg_size, arg_code =
+			List.fold_left (fun (a_size, a_code) e ->
+				(a_size + round8 (size_of e.info),
+				compile_expr env e ++ a_code)
+			) (0, nop) params
+		in
+		subq ~$size_ret ~%rsp ++
+		arg_code ++
+		call f.node ++
+		addq ~$arg_size ~%rsp
+	| Esizeof t	->failwith "todo"
+	|_ -> compile_lvalue_reg env e
 
-let rec compile_expr env e =
+and compile_lvalue_reg env e =
+	match e.node with
+	| Eident e ->
+		begin
+			try
+				let offset = Env.find e.node env in
+				leaq (addr ~%rbp ~ofs:offset) ~%r10
+			with Not_found ->
+				movq ~:(e.node) ~%r10
+		end
+	| Eunop(Deref, e) -> failwith "todo"
+	| Egetarr (e, i) -> failwith "todo"
+	| _ -> failwith "todo"
+
+and compile_expr env e =
     match e.info with
     | Tstruct _ -> assert false
     | Tvoid -> compile_expr_reg env e
@@ -69,14 +157,12 @@ let rec compile_expr env e =
         compile_expr_reg env e ++ pushq ~%r10
     | t ->
         let n = size_of t in
-        let mask = if n = 4 then 0xffffffff
-            else if n = 2 then 0xffffffff
-            else 0xff
-        in
+        let mask = (1 lsl (n*8)) -1 in
+        compile_expr_reg env e ++
         andq ~$mask ~%r10 ++
         pushq ~%r10
 
-let compile_clean_expr env e =
+and compile_clean_expr env e =
     let ecode = compile_expr env e in
     ecode ++ (if e.info = Tvoid then nop else popq ~%r10)
 
@@ -84,13 +170,15 @@ let rec compile_instr lab_fin rbp_offset env i =
     match i.node with
     | Sskip -> rbp_offset, nop
     | Sexpr e -> rbp_offset, compile_clean_expr env e
-    | Sreturn oe ->
-        rbp_offset, (
-            match oe with
-            | None -> nop
-            | Some e -> compile_expr env e
-        ) ++ jmp lab_fin
-    | _ -> assert false
+    | Sblock b -> compile_block lab_fin rbp_offset env b
+	| Sreturn oe ->
+		rbp_offset, (
+			match oe with
+			| None -> nop
+			| Some e -> compile_expr env e
+		) ++ jmp lab_fin
+	| Sif (e, i1, i2) -> assert false
+	| Sfor (e1, e2, e3, i) -> assert false
 
 and compile_block lab_fin rbp_offset env (var_decls, instrs) =
     let new_offset, new_env, debug =
@@ -156,8 +244,13 @@ let compile_prog p =
     let text, data =
         List.fold_left compile_decl (nop, nop) p
     in
+    let data = Hashtbl.fold (fun str lbl a_data ->
+        a_data ++
+        label lbl ++
+        string str
+    ) string_env data
+    in
     {
-        text = nop;
-        data = nop
-
+        text = text;
+        data = data
     }

@@ -222,13 +222,13 @@ let rec type_expr env e =
        | Arrow -> assert false
      end
 
-  (*| Egetarr (expr1, expr2) -> let  te0 = type_expr env expr1 in
+  | Egetarr (expr1, expr2) -> let  te0 = type_expr env expr1 in
                               let te1 = type_expr env expr2 in
                               if not (arith te0.info) then
                                 error expr1.info "Type invalide - liste";
                               if not (arith te1.info) then
                                 error expr2.info "Type invalide - indice liste";
-                              mk_node te0.info (Egetarr(te0, te1)) *)
+                              mk_node te0.info (Egetarr(te0, te1))
 
   | Ecall (f, params) ->
      let tparams = List.map (type_expr env) params in
@@ -236,17 +236,17 @@ let rec type_expr env e =
        try
          let tret, _, args, _ = Hashtbl.find fun_env f.node in
          try
-           let new_params =
-             List.map2 (fun e (t, x) ->
-                 if not (compatible e.info t) then
-                   error x.info ("Type invalide pour le paramètre" ^ x.node ^ " de " ^ f.node)
+             let new_params =
+                 if args = [] then
+                     tparams
                  else
-                   mk_cast t e
-               )
-                       tparams
-                       args;
-           in
-           mk_node tret (Ecall(f, tparams))
+                     List.map2 (fun e(t, x) ->
+                         if not (compatible e.info t) then
+                             error x.info ("Invalid type")
+                         else
+                             mk_node t (Ecast(t, e))
+                 ) tparams args in
+             mk_node tret (Ecall(f, new_params))
          with Invalid_argument _ -> error f.info ("Nombre d'arguments invalide pour " ^ f.node)
        with Not_found -> error f.info ("La fonction " ^ f.node ^ " n'existe pas")
      end
