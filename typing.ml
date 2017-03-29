@@ -208,7 +208,7 @@ let rec type_expr env e =
        | Add -> mk_node nte1.info (Ebinop(nte1, Add, nte2))
        | Mult -> mk_node nte1.info (Ebinop(nte1, Mult, nte2))
        | Minus -> mk_node nte1.info (Ebinop(nte1, Minus, nte2))
-       | Div -> mk_node nte1.info (Ebinop(nte1, Minus, nte2))
+       | Div -> mk_node nte1.info (Ebinop(nte1, Div, nte2))
        | Mod -> mk_node nte1.info (Ebinop(nte1, Mod, nte2))
        | And -> mk_node nte1.info (Ebinop(nte1, And, nte2))
        | Or -> mk_node nte1.info (Ebinop(nte1, Or, nte2))

@@ -34,8 +34,8 @@ int test2() {
   return 42;
 }
 
-/*
-void test2() {
+
+void test3() {
   int* test;
   test;
   test[0];
@@ -43,7 +43,7 @@ void test2() {
 }
 
 
-void test3() {
+void test4() {
 
   int t1;
   int t2;
@@ -79,4 +79,3 @@ void test3() {
   (void)t1;
   (t1);
 }
-*/

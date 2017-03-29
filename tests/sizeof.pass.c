@@ -1,4 +1,3 @@
 int main() {
-  sizeof(void);
-
+  sizeof(int);
 }

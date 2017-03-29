@@ -56,6 +56,9 @@ let const_string = ['\"'] (const_char | [' '] | ['\t'])+ ['\"']
 rule token = parse
   | '\n'             { newline lexbuf; token lexbuf }
   | [' ' '\t' '\r']+ { token lexbuf }
+  | "/*"             { comment lexbuf }
+  | "#"              { macro lexbuf }
+  | "*/"             { raise (Lexical_error "Error: unmatched comment ending") }
   | eof              { EOF }
   | ";"              { SEMI }
   | "="              { ASSIGN }
@@ -93,16 +96,13 @@ rule token = parse
   | ['-']? const_float      { NUM_FLOAT (float_of_string (lexeme lexbuf)) }
   | const_string     { CONST_STRING (lexeme lexbuf)  }
   | identifier       { keyword_or_ident(lexeme lexbuf) }
-  | "/*"             { comment lexbuf }
-  | "#"              { macro lexbuf }
-  | "*/"             { failwith "Error: unmatched comment ending" }
   | _                { char_error (lexeme lexbuf) }
 
 and comment = parse
             | "*/" { token lexbuf }
             | _    { comment lexbuf }
-            | "/*" { failwith "Error: Imbricated comments are forbiden" }
-            | eof  { failwith "Lexical error : unterminated comment" }
+            | "/*" { raise (Lexical_error "Imbricated comments are forbiden") }
+            | eof  { raise (Lexical_error "Unterminated comment") }
 
 and macro = parse
           | _             { macro lexbuf }

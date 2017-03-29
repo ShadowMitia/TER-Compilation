@@ -12,3 +12,8 @@ void variable_declarations() {
   int** ipp;
   void****** void_de_malade;
 }
+
+int main() {
+  variable_declarations();
+  return 0;
+}
