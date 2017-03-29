@@ -179,7 +179,8 @@ let rec compile_expr_reg env e =
        subq ~$size_ret ~%rsp ++
 	 arg_code ++
 	 call f.node ++
-	 addq ~$arg_size ~%rsp
+	 addq ~$arg_size ~%rsp ++
+         popq ~%r10
   | Esizeof t	->failwith "todo"
   |_ -> compile_lvalue_reg env e
 
