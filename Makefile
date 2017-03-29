@@ -89,6 +89,8 @@ clean:
 	rm -f $(SRC_MLL:.mll=.ml) $(SRC_MLY:.mly=.ml) $(SRC_MLY:.mly=.mli)
 	rm -f $(EXEC)
 	rm -f $(EXEC).opt
+	@cd tests && $(MAKE) clean
+
 
 
 depend: $(SMLIYL)
@@ -98,14 +100,10 @@ depend: $(SMLIYL)
 
 -include depend
 
-# Tests unitaires
+
+# Tests unitaires (pas portable probablement...)
+
+.PHONY: test
 
 test:
-#TODO: mieux detecter les valeurs de retours (tester la présence de noms d'exceptions)
-	@for i in $(shell ls tests/*.c); do \
-		echo -n "Testing on " \"$$i\"; \
-		./$(EXEC) $$i; \
-		if [[ ("$$?" -ne 0 && "$$i" = *".fail."* ) \
-		|| ( "$$?" -eq 0 && "$$i" = *".pass."* ) ]]; \
-		then echo "	[PASSED]"; else echo "	[FAILED]"; fi \
-	done
+	@cd tests && $(MAKE)

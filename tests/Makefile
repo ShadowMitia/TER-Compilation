@@ -3,48 +3,32 @@
 #SRC_FAIL=$(shell find . -name "*fail.c" -printf '%f\n')
 #SRC=$(shell find -name "*.c" ! -name "*fail.c" ! -name "*pass.c" -printf '%f\n')
 SRC_ALL := $(wildcard *.c)
-SRC_PASS := $(filter *.pass.c, $(wildcard *.c))
-SRC_FAIL := $(filter *.fail.c, $(SRC_ALL))
+SRC_EXE := $(SRC_ALL:.c=.exe)
+
 COMPILER := ../minic
 CC := gcc
-OBJ_PASS := $(SRC_PASS:%.c = %.s)
 
-all:
-	@echo "Compiling test"
-#	$(COMPILER) -type-only $(SRC_PASS)
-#	$(COMPILER) -type-only $(SRC_FAIL)
-#	$(COMPILER) $(SRC)
+.SECONDARY:
+
+all: build
 	echo $(SRC_ALL)
-	echo $(SRC_PASS)
-	echo $(OBJ_PASS)
-	@echo "Done"
 
--include $(OBJ_PASS)
+.PHONY: build
+
+build: $(SRC_EXE)
 
 %.s:%.c
-	@echo "Compiling"
-	$(COMPILER) $^
+	@echo "Compiling" $^
+	@$(COMPILER) $^
 
 %.exe:%.s
-	@echo "Compile GCC"
+	@echo "Generating" $@
 	$(CC) -o $@ $^
-
-#%.pass.s: %.pass.c
-#	@echo "Compiling things pass"
-#	$(COMPILER) -type-only $<
-
-# %.fail.s: %.fail.c
-# 	@echo "Compiling things fail"
-# 	$(COMPILER) -type-only $<
-
-#%.s: %.c
-#	@echo "Compiling things"
-#	$(COMPILER) $<
 
 clean:
 	rm -f *.s
+	rm -f *.exe
 
-# gen_c:
 # 	@echo -e "\n \n"
 # 	@echo -e "\n C \n"
 # 	@echo -e "\n \n"

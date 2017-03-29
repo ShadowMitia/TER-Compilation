@@ -21,7 +21,8 @@ let rec fold2 f acc l1 l2 =
 (* Donne la taille en octets d'un type donné *)
 let size_of t =
   match t with
-  | Tvoid | Tnull -> assert false
+  | Tvoid -> 0
+  | Tnull -> assert false
   | Tinteger (_, Char) -> 1
   | Tinteger (_, Short) -> 2
   | Tinteger (_, Int) -> 4
@@ -34,7 +35,7 @@ let align_of t =
   | _ -> size_of t
 
 let round8 n  =
-  if n mod 8 = 0 then n else ((n/8) + 1) * 8;;
+  if n mod 8 = 0 then n else ((n/8) + 1) * 8
 
 let compile_const c =
   match c with

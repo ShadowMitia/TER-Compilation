@@ -55,7 +55,7 @@ let const_string = ['\"'] (const_char | [' '] | ['\t'])+ ['\"']
 
 rule token = parse
   | '\n'             { newline lexbuf; token lexbuf }
-  | [' ' '\t' '\r']+ { token lexbuf }
+  | [' ' '\t' '\r'] + { token lexbuf }
   | "/*"             { comment lexbuf }
   | "#"              { macro lexbuf }
   | "*/"             { raise (Lexical_error "Error: unmatched comment ending") }
@@ -89,14 +89,20 @@ rule token = parse
   | "."              { DOT }
   | "["              { L_SQ_BRACKET }
   | "]"              { R_SQ_BRACKET }
+  | "//"             { comment_line lexbuf }
   | (['-'])? digit+ (['u'] | ['U']) (['l'] | ['L']) { UNSIGNED_LONG_NUM (int64_of_number_string (lexeme lexbuf) 2) }
   | ['-']? digit+ (['l'] | ['L']) { LONG_NUM (int64_of_number_string (lexeme lexbuf) 1) }
   | digit+ (['u'] | ['U']) { UNSIGNED_NUM (int64_of_number_string (lexeme lexbuf) 1) }
   | ['-']? digit+ { NUM (int64_of_number_string (lexeme lexbuf) 0) }
   | ['-']? const_float      { NUM_FLOAT (float_of_string (lexeme lexbuf)) }
   | const_string     { CONST_STRING (lexeme lexbuf)  }
-  | identifier       { keyword_or_ident(lexeme lexbuf) }
+  | identifier       { keyword_or_ident (lexeme lexbuf) }
   | _                { char_error (lexeme lexbuf) }
+
+and comment_line = parse
+                 | _            { comment_line lexbuf }
+                 | ['\r' '\n']+ { token lexbuf }
+                 | eof          { raise (Lexical_error "EOF reached") }
 
 and comment = parse
             | "*/" { token lexbuf }
