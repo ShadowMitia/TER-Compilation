@@ -118,7 +118,6 @@ let type_const c =
   | Cstring _ -> Tpointer (Tinteger(Signed, Char))
   | Cdouble _ -> Tdouble
   | Cint(s, i, _) -> Tinteger (s, i)
-  | _ -> assert false
 
 (* A VERIFIER: les ariths et nums de chaque cas *)
 (* TODO: finir les messages d'erreurs *)
@@ -278,9 +277,11 @@ and type_lvalue env e =
   | _ -> error e.info "Valeur gauche attendue "
 
 and type_struct_access env s iden =
-  let var_ident = match iden.node with
+ let var_ident = begin match iden.node with
     | Eident i -> i
-    | _ -> assert false in
+    | _ -> assert false
+    end
+  in
   let t_struct = type_expr env s in
   match t_struct.info with
   | Tstruct id ->
@@ -320,6 +321,7 @@ let rec type_instr ty env i =
   | Sreturn None -> mk_node Tvoid (Sreturn None)
   | Sreturn (Some b) -> let tb = type_expr env b in
                         mk_node tb.info (Sreturn (Some tb))
+  | _ -> error i.info ("Erreur de l'instruction")
 
 and type_block t env (var_decl, instrs) =
   let new_env = add_env env var_decl in

@@ -58,7 +58,6 @@ opérateur                                associativité précédence
 
 *)
 
-
 %right ASSIGN
 %left OR
 %left AND
@@ -67,9 +66,32 @@ opérateur                                associativité précédence
 %left PLUS MINUS
 %left STAR DIV MOD
 %right NOT PLUSPLUS MINUSMINUS BAND USTAR UPLUS UMINUS
-%left RPAR LBRACKET ARROW DOT
+%left RPAR L_SQ_BRACKET ARROW DOT
+
 %nonassoc REDUCE (* Ref: http://docs.oracle.com/cd/E19504-01/802-5880/6i9k05dh3/index.html *)
 %nonassoc ELSE
+
+/*
+UNSIGNED_NUM
+UNSIGNED_LONG_NUM
+STAR
+SIZEOF
+PLUSPLUS
+PLUS
+NUM_FLOAT
+NUM
+NOT
+MINUSMINUS
+MINUS
+LPAR
+LONG_NUM
+IDENT
+CONST_STRING
+CONST_CHAR
+BAND
+*/
+
+
 
 /* Point d'entrée */
 
@@ -102,11 +124,11 @@ block:
 
 instruction_:
    | SEMI { Sskip }
-   | expr = expression { Sexpr expr }
+   | expr = expression SEMI { Sexpr expr }
    | IF LPAR expr = expression RPAR instr1 = instruction ELSE instr2 = instruction { Sif(expr, instr1, Some instr2) }
    | IF LPAR expr = expression RPAR instr = instruction %prec REDUCE { Sif(expr, instr, None) }
    | WHILE LPAR cond = expression RPAR instr = instruction { Sfor(None, Some cond, None, instr) }
-   | FOR LPAR expr1 = l_expr SEMI cond = expression SEMI RPAR expr2 = l_expr instr = instruction { Sfor(Some expr1, Some cond, Some expr2, instr) }
+   | FOR LPAR expr1 = l_expr SEMI cond = expression SEMI expr2 = l_expr RPAR instr = instruction { Sfor(Some expr1, Some cond, Some expr2, instr) }
    | b = block { Sblock b }
    | RETURN expr = expression SEMI { Sreturn (Some expr) }
    | RETURN SEMI { Sreturn None }
@@ -126,8 +148,8 @@ expression_:
    | n = LONG_NUM { Econst(Cint(Signed, Long, n)) }
    | n = UNSIGNED_NUM { Econst(Cint(Unsigned, Int, n)) }
    | n = NUM_FLOAT { Econst(Cdouble(n)) }
-   | c = CONST_CHAR { Econst(Cstring(c)) }
-   | c = CONST_STRING { Econst(Cstring(c)) }
+   | c = CONST_CHAR { Econst(Cstring(c)) }  (* A CHANGER PROBABLMENT *)
+   | c = CONST_STRING { Econst(Cstring(c)) } (* A CHANGER PROBABLEMENT *)
    | i = identifier { Eident(i) }
    | STAR expr = expression %prec USTAR { Eunop(Deref, expr) }
    | expr1 = expression L_SQ_BRACKET expr2 = expression R_SQ_BRACKET {print_string "table"; Eunop(Deref, mk_loc (Ebinop(expr1, Add, expr2))  ($startpos, $endpos) ) }
