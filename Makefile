@@ -106,4 +106,4 @@ depend: $(SMLIYL)
 .PHONY: test
 
 test:
-	@cd tests && $(MAKE)
+	@cd tests && $(MAKE) -i

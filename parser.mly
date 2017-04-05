@@ -148,11 +148,11 @@ expression_:
    | n = LONG_NUM { Econst(Cint(Signed, Long, n)) }
    | n = UNSIGNED_NUM { Econst(Cint(Unsigned, Int, n)) }
    | n = NUM_FLOAT { Econst(Cdouble(n)) }
-   | c = CONST_CHAR { Econst(Cstring(c)) }  (* A CHANGER PROBABLMENT *)
-   | c = CONST_STRING { Econst(Cstring(c)) } (* A CHANGER PROBABLEMENT *)
+   | c = CONST_CHAR { Econst(Cstring(c)) }
+   | c = CONST_STRING { Econst(Cstring(c)) }
    | i = identifier { Eident(i) }
    | STAR expr = expression %prec USTAR { Eunop(Deref, expr) }
-   | expr1 = expression L_SQ_BRACKET expr2 = expression R_SQ_BRACKET {print_string "table"; Eunop(Deref, mk_loc (Ebinop(expr1, Add, expr2))  ($startpos, $endpos) ) }
+   | expr1 = expression L_SQ_BRACKET expr2 = expression R_SQ_BRACKET {Eunop(Deref, mk_loc (Ebinop(expr1, Add, expr2))  ($startpos, $endpos) ) }
    | expr = expression DOT id = identifier SEMI { Ebinop(expr, Dot, mk_loc (Eident id) id.info) }
    | expr = expression ARROW id = identifier SEMI { (Ebinop(expr, Dot, mk_loc (Eident id) id.info )) }
    | expr1 = expression ASSIGN expr2 = expression { Eassign(expr1, expr2) }

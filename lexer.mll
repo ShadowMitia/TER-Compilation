@@ -43,19 +43,29 @@
   let int64_of_number_string num ign =
     Int64.of_string (String.sub num 0 ((String.length num) - ign))
 
+  let process_char c =
+    match c with
+    | "\\n" -> "\n"
+    | "\\t" -> "\t"
+    | "\\r" -> "\r"
+    | "\\\\"  -> "\\"
+    | _ as s -> print_string ("["^s^"]"); s
+
+  let string_buffer = Buffer.create 80
+
 }
 
 let digit = ['0'-'9']
 let alpha = ['a'-'z' 'A'-'Z']
 let identifier = (alpha | ['_']) (alpha | digit | ['_'])*
 let const_float = (digit+ ['.'] digit* | ['.']digit+)((['e'] | ['E'])['-']?digit+)?
-let const_char = ([' '-'~']#['\'' '\\' '\"'])
-let const_string = ['\"'] (const_char | [' '] | ['\t'])+ ['\"']
-
+let simple_char = [' '-'~']#['\'' '\\' '\"']
+let complexe_char = ['\\'] (['\\'] | ['n'] | ['t'] | ['r'])
+let const_string = ['"'] (simple_char | complexe_char)* ['"']
 
 rule token = parse
   | '\n'             { newline lexbuf; token lexbuf }
-  | [' ' '\t' '\r'] + { token lexbuf }
+  | [' ' '\t' '\r']+ { token lexbuf }
   | "/*"             { comment lexbuf }
   | "#"              { macro lexbuf }
   | "*/"             { raise (Lexical_error "Error: unmatched comment ending") }
@@ -90,19 +100,26 @@ rule token = parse
   | "["              { L_SQ_BRACKET }
   | "]"              { R_SQ_BRACKET }
   | "//"             { comment_line lexbuf }
+  | "\""             { Buffer.reset string_buffer; CONST_STRING(string lexbuf) }
   | (['-'])? digit+ (['u'] | ['U']) (['l'] | ['L']) { UNSIGNED_LONG_NUM (int64_of_number_string (lexeme lexbuf) 2) }
   | ['-']? digit+ (['l'] | ['L']) { LONG_NUM (int64_of_number_string (lexeme lexbuf) 1) }
   | digit+ (['u'] | ['U']) { UNSIGNED_NUM (int64_of_number_string (lexeme lexbuf) 1) }
   | ['-']? digit+ { NUM (int64_of_number_string (lexeme lexbuf) 0) }
   | ['-']? const_float      { NUM_FLOAT (float_of_string (lexeme lexbuf)) }
-  | const_string     { CONST_STRING (lexeme lexbuf)  }
   | identifier       { keyword_or_ident (lexeme lexbuf) }
   | _                { char_error (lexeme lexbuf) }
 
+and string = parse
+           (* TODO: changer les char en leur valeur pour que ce soit correctement interprété *)
+           | simple_char   { Buffer.add_string string_buffer (lexeme lexbuf); string lexbuf }
+           | complexe_char { Buffer.add_string string_buffer (process_char (lexeme lexbuf));  string lexbuf }
+           | "\""          { print_string(Buffer.contents string_buffer); Buffer.contents string_buffer }
+           | _             { raise (Lexical_error "Invalid character") }
+
 and comment_line = parse
                  | _            { comment_line lexbuf }
-                 | ['\r' '\n']+ { token lexbuf }
-                 | eof          { raise (Lexical_error "EOF reached") }
+                 | ['\n' '\r']+ { token lexbuf }
+                 | eof          { token lexbuf }
 
 and comment = parse
             | "*/" { token lexbuf }

@@ -3,8 +3,10 @@ open Amd64
 open Typing
 
 let string_env = Hashtbl.create 17
+let double_env = Hashtbl.create 17
 
 let int_registers = [rdi; rsi; rdx; rcx; r8; r9]
+let double_registers = [ xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7]
 
 (* Helper pour générer un label dans le code assembleur *)
 let new_label =
@@ -53,8 +55,17 @@ let compile_const c =
 	 lab
      in
      mov ~:label ~%r10
-  | Cdouble d ->
-     failwith("todo")
+  | Cdouble s ->
+     let label =
+       try
+	 Hashtbl.find double_env s
+       with Not_found ->
+	 let lab = new_label "string" in
+	 Hashtbl.add double_env s lab;
+	 lab
+     in
+     mov ~:label ~%r10 ++
+     mov (addr ~%r10) ~%r10
 
 let reg_size_of t =
   match size_of t with
@@ -92,7 +103,19 @@ let is_signed t = match t with
   | Tinteger (Signed, _) | Tpointer _ | Tnull -> true
   | _ -> false
 
-let rec compile_expr_reg env e =
+let rec assign_regs env args iregs dregs (d_acc, code_acc) =
+  match args, iregs, dregs with
+  | [], _, _ -> d_acc, code_acc
+  | e :: _, _,  [] when e.info = Tdouble -> assert false
+  | e :: _, [], _ -> assert false
+  | e :: next_args, _, dreg :: next_dregs when e.info = Tdouble ->
+     assign_regs env next_args iregs next_dregs
+                 (1 + d_acc, code_acc ++ compile_expr env e ++ popd ~%dreg)
+  | e :: next_args, ireg :: next_iregs, _ ->
+     assign_regs env next_args next_iregs dregs
+     (d_acc, code_acc ++ compile_expr env e ++ popq ~%ireg)
+
+and compile_expr_reg env e =
   match e.node with
   | Econst c -> compile_const c
   | Ecast (t, e0) ->
@@ -111,7 +134,7 @@ let rec compile_expr_reg env e =
      e2_code ++
        e1_code ++
        popq ~%r11 ++
-       mov ~%reg (addr ~%r10)++
+       mov ~%reg (addr ~%r10) ++
        movq ~%r11 ~%r10
   | Ebinop(e1, op, e2) ->
      let e1code = compile_expr env e1 in
@@ -123,6 +146,11 @@ let rec compile_expr_reg env e =
          match op with
          | Add -> failwith "todo binop add"
          | Mult -> failwith "todo binop mult"
+         | Div when type_eq e1.info Tdouble ->
+            movq ~%r10 ~%xmm0 ++
+            movq ~%r11 ~%xmm1 ++
+            divsd ~%xmm0 ~%xmm1 ++
+            movq ~%xmm1 ~%r10
          | Div | Mod ->
             let rsize = reg_size_of e1.info in
             let ra = rax_ rsize in
@@ -158,17 +186,13 @@ let rec compile_expr_reg env e =
   | Ecall (f, params) ->
      let tret,_,_, extern = Hashtbl.find fun_env f.node in
      if extern then
-       let arg_code = fold2 (fun (a_code) e r ->
-			  a_code++
-			    compile_expr env e ++
-			    popq ~%r
-			) nop params int_registers
+       let n_double, arg_code =
+         assign_regs env params int_registers double_registers (0, nop)
        in
-       print_string "extern";
        arg_code ++
-	 xorq ~%rax ~%rax++
-	 call f.node ++
-	 mov ~%rax ~%r10
+       mov ~$n_double ~%rax ++
+       call f.node ++
+       mov ~%rax ~%r10
      else
        let size_ret = round8 (size_of tret) in
        let arg_size, arg_code =
@@ -181,8 +205,8 @@ let rec compile_expr_reg env e =
 	 arg_code ++
 	 call f.node ++
 	 addq ~$arg_size ~%rsp ++
-         popq ~%r10
-  | Esizeof t	->failwith "todo"
+         if (tret <> Tvoid) then popq ~%r10 else nop
+  | Esizeof t -> failwith "todo"
   |_ -> compile_lvalue_reg env e
 
 and compile_lvalue_reg env e =
@@ -227,23 +251,32 @@ let rec compile_instr lab_fin rbp_offset env i =
       | None -> nop
       | Some e -> compile_expr env e
     ) ++ jmp lab_fin
-  | Sif (e, i1, i2) ->
-     let cond = comment "if" ++ compile_expr env e in
-     let b1 = new_label "b1" in
-     let b2 = new_label "b2" in
-     cmpq ~%r10 ~$0;
-     let block_1 = comment "i1" (* ++ (compile_instr lab_fin rbp_offset env i1) *)  in
-     let block_2 = comment "i2" (* ++ ( compile_instr lab_fin rbp_offset env i2) *)  in
-       rbp_offset, cond ++
-                     jne b1 ++
-                     jmp b2 ++
-                     label b1 ++
-                     block_1 ++
-                     label b2 ++
-                     block_2 ++
-                     comment "fin if"
+  | Sif (e, i1, i2) -> rbp_offset,
+     let cond = comment "condition if" ++ compile_expr env e ++ comment "fin condition if" in
+     let e = new_label "else" in
+     let if_end = new_label "if_end" in
+     let rbp_offset, b1 = compile_instr lab_fin rbp_offset env i1 in
+     let rbp_offset, b2 =
+       match i2 with
+       | Some i2 ->(compile_instr lab_fin rbp_offset env i2)
+       | None -> rbp_offset, nop
+       in
+     cond ++
+     cmpq ~$0 ~%r10 ++
+     je e ++
+     b1 ++
+     jmp if_end ++
+     label e ++
+     b2 ++
+     label if_end ++
+     comment "end if"
 
   | Sfor (e1, e2, e3, i) -> assert false
+     (*let init = compile_expr env e1 in
+     let cond = compile_expr env e2 in
+     let change = compile_expr env e3 in
+     let b = compile_expr i in
+     assert false*)
 
 and compile_block lab_fin rbp_offset env (var_decls, instrs) =
   let new_offset, new_env, debug =
@@ -314,6 +347,11 @@ let compile_prog p =
                    label lbl ++
                    string str
                ) string_env data
+  in
+  let data = Hashtbl.fold (fun dbl lbl a_data ->
+                        a_data ++
+                          label lbl ++
+                          ddouble [dbl]) double_env data
   in
   {
     text = text;

@@ -11,7 +11,6 @@ CC := gcc
 .SECONDARY:
 
 all: build
-	echo $(SRC_ALL)
 
 .PHONY: build
 
