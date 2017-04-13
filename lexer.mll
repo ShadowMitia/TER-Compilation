@@ -113,7 +113,7 @@ and string = parse
            (* TODO: changer les char en leur valeur pour que ce soit correctement interprété *)
            | simple_char   { Buffer.add_string string_buffer (lexeme lexbuf); string lexbuf }
            | complexe_char { Buffer.add_string string_buffer (process_char (lexeme lexbuf));  string lexbuf }
-           | "\""          { print_string(Buffer.contents string_buffer); Buffer.contents string_buffer }
+           | "\""          { Buffer.contents string_buffer }
            | _             { raise (Lexical_error "Invalid character") }
 
 and comment_line = parse

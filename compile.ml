@@ -13,13 +13,6 @@ let new_label =
   let c = ref 0 in
   fun s -> incr c; Printf.sprintf "__label__%s_%05i" s !c
 
-(* *)
-let rec fold2 f acc l1 l2 =
-  match l1, l2 with
-  | [], _ -> acc
-  | _,[] -> failwith "fold2"
-  | x1::ll1, x2::ll2 -> fold2 f(f acc x1 x2) ll1 ll2
-
 (* Donne la taille en octets d'un type donné *)
 let size_of t =
   match t with
@@ -65,7 +58,7 @@ let compile_const c =
 	 lab
      in
      mov ~:label ~%r10 ++
-     mov (addr ~%r10) ~%r10
+       mov (addr ~%r10) ~%r10
 
 let reg_size_of t =
   match size_of t with
@@ -103,6 +96,17 @@ let is_signed t = match t with
   | Tinteger (Signed, _) | Tpointer _ | Tnull -> true
   | _ -> false
 
+let comp_res comp =
+  let lf = new_label "cond" in
+  let le = new_label "cond_end" in
+  comp lf ++
+    movq ~$0 ~%r10 ++
+    jmp le ++
+    label lf ++
+    movq ~$1 ~%r10 ++
+    label le
+
+
 let rec assign_regs env args iregs dregs (d_acc, code_acc) =
   match args, iregs, dregs with
   | [], _, _ -> d_acc, code_acc
@@ -113,7 +117,7 @@ let rec assign_regs env args iregs dregs (d_acc, code_acc) =
                  (1 + d_acc, code_acc ++ compile_expr env e ++ popd ~%dreg)
   | e :: next_args, ireg :: next_iregs, _ ->
      assign_regs env next_args next_iregs dregs
-     (d_acc, code_acc ++ compile_expr env e ++ popq ~%ireg)
+                 (d_acc, code_acc ++ compile_expr env e ++ popq ~%ireg)
 
 and compile_expr_reg env e =
   match e.node with
@@ -131,26 +135,28 @@ and compile_expr_reg env e =
      let e1_code = compile_lvalue_reg env e1 in
      let e2_code = compile_expr env e2 in
      let reg = r11_ (reg_size_of e1.info) in
-     e2_code ++
+     comment "assign" ++
+       e2_code ++
        e1_code ++
        popq ~%r11 ++
        mov ~%reg (addr ~%r10) ++
-       movq ~%r11 ~%r10
+       movq ~%r11 ~%r10 ++
+       comment "end assign"
   | Ebinop(e1, op, e2) ->
      let e1code = compile_expr env e1 in
      let e2code = compile_expr_reg env e2 in
      e1code ++
-     e2code ++ (* e2 dans r10 *)
-     popq ~%r11 ++(* e1 dans r11 *)
+       e2code ++ (* e2 dans r10 *)
+       popq ~%r11 ++(* e1 dans r11 *)
        begin
          match op with
          | Add -> failwith "todo binop add"
          | Mult -> failwith "todo binop mult"
          | Div when type_eq e1.info Tdouble ->
             movq ~%r10 ~%xmm0 ++
-            movq ~%r11 ~%xmm1 ++
-            divsd ~%xmm0 ~%xmm1 ++
-            movq ~%xmm1 ~%r10
+              movq ~%r11 ~%xmm1 ++
+              divsd ~%xmm0 ~%xmm1 ++
+              movq ~%xmm1 ~%r10
          | Div | Mod ->
             let rsize = reg_size_of e1.info in
             let ra = rax_ rsize in
@@ -174,15 +180,32 @@ and compile_expr_reg env e =
          | Or -> failwith "todo binop or"
          | Eq -> failwith "todo binop eq"
          | Neq -> failwith "todo binop neq"
-         | Lt -> failwith "todo binop lt"
+         | Lt -> cmpq ~%r10 ~%r11 ++ comp_res jl
          | Le -> failwith "todo binop le"
-         | Gt -> failwith "todo binop gt"
          | Ge -> failwith "todo binop ge"
+         | Gt -> failwith "todo binop gt"
          | Dot -> failwith "todo binop dot"
          | Arrow -> failwith "todo binop arrow"
          | _ -> failwith "unknown binop"
        end
-  | Eunop (unop , e0) -> failwith "todo unop"
+  | Eunop (unop , e0) ->
+     begin
+       let ecode = compile_lvalue_reg env e0 in
+       comment "unop" ++
+         ecode ++
+         match unop with
+         | Neg -> assert false (*comment "neg" ++ negq ~%r10*)
+         | Deref -> assert false
+         | Pos -> assert false
+         | Addr -> assert false
+         | PreInc -> assert false
+         | PreDec -> assert false
+         | PostInc -> comment "++" ++ addq ~$1 (addr ~%r10)
+         | PostDec -> assert false
+         | Not -> assert false (*comment "not" ++ notq ~%r11*)
+     end
+    ++ pushq (addr ~%r10)
+     ++ comment "end unop"
   | Ecall (f, params) ->
      let tret,_,_, extern = Hashtbl.find fun_env f.node in
      if extern then
@@ -190,9 +213,9 @@ and compile_expr_reg env e =
          assign_regs env params int_registers double_registers (0, nop)
        in
        arg_code ++
-       mov ~$n_double ~%rax ++
-       call f.node ++
-       mov ~%rax ~%r10
+         mov ~$n_double ~%rax ++
+         call f.node ++
+         mov ~%rax ~%r10
      else
        let size_ret = round8 (size_of tret) in
        let arg_size, arg_code =
@@ -207,51 +230,66 @@ and compile_expr_reg env e =
 	 addq ~$arg_size ~%rsp ++
          if (tret <> Tvoid) then popq ~%r10 else nop
   | Esizeof t -> failwith "todo"
-  |_ -> compile_lvalue_reg env e
+(*|_ -> compile_lvalue_reg env e*)
 
 and compile_lvalue_reg env e =
   match e.node with
   | Eident e ->
-     begin
-       try
-	 let offset = Env.find e.node env in
-	 leaq (addr ~%rbp ~ofs:offset) ~%r10
-       with Not_found ->
-	 movq ~:(e.node) ~%r10
-     end
+     comment "Eident" ++
+       begin
+         try
+	   let offset = Env.find e.node env in
+	   leaq (addr ~%rbp ~ofs:offset) ~%r10
+         with Not_found ->
+	   movq ~:(e.node) ~%r10
+       end
+     ++ comment "f Eident"
   | Eunop(Deref, e) -> failwith "todo"
   | Egetarr (e, i) -> failwith "todo"
   | _ -> failwith "todo"
 
 and compile_expr env e =
   match e.info with
-  | Tstruct _ -> assert false
-  | Tvoid -> compile_expr_reg env e
+  | Tstruct _ -> failwith "On gère pas les structures"
+  | Tvoid -> comment "void" ++ compile_expr_reg env e ++ comment "tvoid"
   | t when size_of t = 8 ->
-     compile_expr_reg env e ++ pushq ~%r10
+     comment "8 octets" ++
+       compile_expr_reg env e ++
+       pushq ~%r10 ++
+       comment "f 8 octets"
   | t ->
      let n = size_of t in
      let mask = (1 lsl (n*8)) -1 in
-     compile_expr_reg env e ++
+     comment "less than 8 octet" ++
+       compile_expr_reg env e ++
+       comment "mask" ++
        andq ~$mask ~%r10 ++
-       pushq ~%r10
+       pushq ~%r10 ++
+       comment "f less than 8 octer"
 
 and compile_clean_expr env e =
   let ecode = compile_expr env e in
   ecode ++ (if e.info = Tvoid then nop else popq ~%r10)
 
+and compile_expr_list env elist =
+  List.fold_left (fun acc e ->
+      let code = compile_expr env e
+      in code ++ acc)
+                 nop elist
+
 let rec compile_instr lab_fin rbp_offset env i =
   match i.node with
-  | Sskip -> rbp_offset, nop
-  | Sexpr e -> rbp_offset, compile_clean_expr env e
-  | Sblock b -> compile_block lab_fin rbp_offset env b
+  | Sskip -> rbp_offset, nop ++ comment "skip"
+  | Sexpr e -> rbp_offset, comment "sexpr" ++ compile_clean_expr env e ++ comment "f sexpr"
+  | Sblock b -> let off, c = compile_block lab_fin rbp_offset env b in
+                off, comment "block" ++ c ++ comment "f block"
   | Sreturn oe ->
-     rbp_offset, (
-      match oe with
-      | None -> nop
-      | Some e -> compile_expr env e
-    ) ++ jmp lab_fin
-  | Sif (e, i1, i2) -> rbp_offset,
+     rbp_offset, comment "return" ++ (
+       match oe with
+       | None -> nop
+       | Some e -> compile_expr env e
+     ) ++ jmp lab_fin ++ comment "f return"
+  | Sif (e, i1, i2) ->
      let cond = comment "condition if" ++ compile_expr env e ++ comment "fin condition if" in
      let e = new_label "else" in
      let if_end = new_label "if_end" in
@@ -260,23 +298,34 @@ let rec compile_instr lab_fin rbp_offset env i =
        match i2 with
        | Some i2 ->(compile_instr lab_fin rbp_offset env i2)
        | None -> rbp_offset, nop
-       in
-     cond ++
-     cmpq ~$0 ~%r10 ++
-     je e ++
-     b1 ++
-     jmp if_end ++
-     label e ++
-     b2 ++
-     label if_end ++
-     comment "end if"
-
-  | Sfor (e1, e2, e3, i) -> assert false
-     (*let init = compile_expr env e1 in
-     let cond = compile_expr env e2 in
-     let change = compile_expr env e3 in
-     let b = compile_expr i in
-     assert false*)
+     in
+     rbp_offset,
+     comment "if" ++
+       cond ++
+       je e ++
+       b1 ++
+       jmp if_end ++
+       label e ++
+       b2 ++
+       label if_end ++
+       comment "end if"
+  | Sfor (e1, e2, e3, i) ->
+     let cond_init = match e1 with | Some e1 -> compile_expr_list env e1 | None -> nop in
+     let cond = match e2 with | Some e2 -> compile_expr env e2 | None -> pushq ~$1 in
+     let cond_change = match e3 with | Some e3 -> compile_expr_list env e3 | None -> nop in
+     let rbp_offset, b = compile_instr lab_fin rbp_offset env i in
+     let for_label = new_label "for" in
+     let for_end = new_label "for_end" in
+     rbp_offset,
+     cond_init ++
+       label for_label ++
+       cond ++
+       cmpq ~$0 ~%r10 ++
+       je for_end ++
+       b ++
+       cond_change ++
+       jmp for_label ++
+       label for_end
 
 and compile_block lab_fin rbp_offset env (var_decls, instrs) =
   let new_offset, new_env, debug =
@@ -349,9 +398,9 @@ let compile_prog p =
                ) string_env data
   in
   let data = Hashtbl.fold (fun dbl lbl a_data ->
-                        a_data ++
-                          label lbl ++
-                          ddouble [dbl]) double_env data
+                 a_data ++
+                   label lbl ++
+                   ddouble [dbl]) double_env data
   in
   {
     text = text;
