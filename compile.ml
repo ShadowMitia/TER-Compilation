@@ -178,12 +178,12 @@ and compile_expr_reg env e =
             ++ (if op = Div then mov ~%ra ~%re2 else mov ~%rd ~%re2)
          | And -> failwith "todo binop and"
          | Or -> failwith "todo binop or"
-         | Eq -> failwith "todo binop eq"
-         | Neq -> failwith "todo binop neq"
+         | Eq -> cmpq ~%r10 ~%r11 ++ comp_res je
+         | Neq -> cmpq ~%r10 ~%r11 ++ comp_res jne
          | Lt -> cmpq ~%r10 ~%r11 ++ comp_res jl
-         | Le -> failwith "todo binop le"
-         | Ge -> failwith "todo binop ge"
-         | Gt -> failwith "todo binop gt"
+         | Le -> cmpq ~%r10 ~%r11 ++ comp_res jle
+         | Ge -> cmpq ~%r10 ~%r11 ++ comp_res jg
+         | Gt -> cmpq ~%r10 ~%r11 ++ comp_res jge
          | Dot -> failwith "todo binop dot"
          | Arrow -> failwith "todo binop arrow"
          | _ -> failwith "unknown binop"
