@@ -13,7 +13,7 @@ let compatible t1 t2 =
   let rec compat_aux t1 t2 =
     match t1, t2 with
     | Tstruct id1, Tstruct id2 -> id1.node = id2.node
-    | Tpointer (Tvoid), Tpointer _ -> true
+    | Tpointer Tvoid, Tpointer _ ->  true
     | Tpointer tt1, Tpointer tt2 -> compat_aux tt1 tt2
     | Tnull, Tpointer _ -> true
     | ((Tdouble | Tnull | Tinteger(_) ), (Tdouble | Tnull | Tinteger(_) )) -> true
@@ -63,6 +63,7 @@ let rank t =
   | Tdouble -> 100
   | Tnull -> 0
   | _ -> assert false
+
 
 let type_lt t1 t2 =
   arith t1 && arith t2 && (rank t1) < (rank t2)
@@ -130,47 +131,47 @@ let rec type_expr env e =
        let te0 = type_expr env e0 in
        match unop with
        | Pos ->
-	         if not (num te0.info) then
-		   error e0.info "Type invalide : '+' pas compatible avec"
+	         if not (arith te0.info) then
+		   error e0.info "Type invalide : '+' pas compatible avec "
 	         else
 		   mk_node te0.info (Eunop(Pos, te0))
        | Neg ->
-	         if not (num te0.info) then
+	         if not (arith te0.info) then
 		   error e0.info "Type invalide : '-' pas compatible avec"
 	         else
 		   mk_node te0.info (Eunop(Neg, te0))
        | Not ->
-	        if not (num te0.info) then
+	        if not (arith te0.info) then
 		  error e0.info "Type invalide : '!' pas compatible avec"
 	        else
 		  mk_node te0.info (Eunop(Not, te0))
        | Deref ->
-                  if not (arith te0.info) then
-                    error e0.info "Type invalide - '&' pas compatible avec"
+                  if not (num te0.info) then
+                    error e0.info "Type invalide - '*' pas compatible avec"
                   else
                     mk_node te0.info (Eunop(Deref, te0))
        | Addr ->
-                  if not (arith te0.info) then
-                    error e0.info "Type invalide"
+                  if not (num te0.info) then
+                    error e0.info "Type invalide - '&'"
                   else
                     mk_node te0.info (Eunop(Addr, te0))
        | PreInc ->
-                   if not (arith te0.info) then
+                   if not (num te0.info) then
                      error e0.info "Type invalide"
                    else
                      mk_node te0.info (Eunop(PreInc, te0))
        | PreDec ->
-                   if not (arith te0.info) then
+                   if not (num te0.info) then
                      error e0.info "Type invalide"
                    else
                      mk_node te0.info (Eunop(PreDec, te0))
        | PostInc ->
-                    if not (arith te0.info) then
+                    if not (num te0.info) then
                       error e0.info "Type invalide"
                     else
                       mk_node te0.info (Eunop(PostInc, te0))
        | PostDec ->
-                    if not (arith te0.info) then
+                    if not (num te0.info) then
                       error e0.info "Type invalide"
                     else
                       mk_node te0.info (Eunop(PostDec, te0))
@@ -218,7 +219,7 @@ let rec type_expr env e =
        | Gt -> mk_node nte1.info (Ebinop(nte1, Gt, nte2))
        | Ge -> mk_node nte1.info (Ebinop(nte1, Ge, nte2))
        | Dot -> assert false (* Dois jamais arrivé *)
-       | Arrow -> assert false
+       | Arrow -> assert false (* Dois jamais arrivé *)
      end
 
   | Egetarr (expr1, expr2) -> let  te0 = type_expr env expr1 in
@@ -253,7 +254,7 @@ let rec type_expr env e =
      let te1 = type_lvalue env e1 in
      let te2 = type_expr env e2 in
      if not (compatible te1.info te2.info) then
-       error e1.info "Type incompatible pour l'affectation"
+       error e1.info ("Type incompatible pour l'affectation")
      else
        mk_node te1.info (Eassign(te1, mk_cast te1.info te2))
   | _ -> type_lvalue env e
@@ -273,7 +274,12 @@ and type_lvalue env e =
      in
      mk_node t (Eident id)
   | Ebinop(e1, Dot, e2) -> type_struct_access env e1 e2
-  | Eunop(Deref, e) -> failwith "lvalue deref"
+  | Eunop(Deref, e) -> let t = type_expr env e in
+                       begin
+                         match t.info with
+                         | Tpointer p -> mk_node p (Eunop(Deref, t))
+                         | _ -> error e.info "Type pointeur attendue après '*'"
+                       end
   | _ -> error e.info "Valeur gauche attendue "
 
 and type_struct_access env s iden =

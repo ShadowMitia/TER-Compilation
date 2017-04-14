@@ -25,7 +25,7 @@
 %token <int64>  LONG_NUM
 %token <float>  NUM_FLOAT
 %token <string> CONST_STRING
-%token <string> CONST_CHAR
+%token <char> CONST_CHAR
 %token VOID
 %token CHAR SHORT INT LONG
 %token DOUBLE
@@ -148,7 +148,7 @@ expression_:
    | n = LONG_NUM { Econst(Cint(Signed, Long, n)) }
    | n = UNSIGNED_NUM { Econst(Cint(Unsigned, Int, n)) }
    | n = NUM_FLOAT { Econst(Cdouble(n)) }
-   | c = CONST_CHAR { Econst(Cstring(c)) }
+   | c = CONST_CHAR { Econst(Cint(Unsigned, Char, Int64.of_int (Char.code c))) }
    | c = CONST_STRING { Econst(Cstring(c)) }
    | i = identifier { Eident(i) }
    | STAR expr = expression %prec USTAR { Eunop(Deref, expr) }
@@ -161,10 +161,10 @@ expression_:
    | MINUSMINUS expr = expression { Eunop(PreDec, expr) }
    | expr = expression PLUSPLUS { Eunop(PostInc, expr) }
    | expr = expression MINUSMINUS { Eunop(PostDec, expr) }
+   | expr1 = expression op = binop expr2 = expression { Ebinop(expr1, op, expr2) }
    | uop = unop expr = expression { Eunop(uop, expr) }
    | MINUS expr = expression %prec UMINUS { Eunop(Neg, expr) }
    | PLUS  expr = expression %prec UPLUS  { Eunop(Pos, expr) }
-   | expr1 = expression op = binop expr2 = expression { Ebinop(expr1, op, expr2) }
    | SIZEOF LPAR cplxtype = cplx_type RPAR {(Esizeof cplxtype) }
    | LPAR cplxtype = cplx_type RPAR expr = expression { Ecast(cplxtype, expr) }
    | LPAR expr = expression_ RPAR { expr }

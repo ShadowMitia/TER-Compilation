@@ -150,8 +150,9 @@ and compile_expr_reg env e =
        popq ~%r11 ++(* e1 dans r11 *)
        begin
          match op with
-         | Add -> failwith "todo binop add"
-         | Mult -> failwith "todo binop mult"
+         | Add -> addq ~%r11 ~%r10
+         | Minus -> subq ~%r11 ~%r10
+         | Mult -> imulq ~%r11 ~%r10
          | Div when type_eq e1.info Tdouble ->
             movq ~%r10 ~%xmm0 ++
               movq ~%r11 ~%xmm1 ++
@@ -201,7 +202,7 @@ and compile_expr_reg env e =
          | PreInc -> assert false
          | PreDec -> assert false
          | PostInc -> comment "++" ++ addq ~$1 (addr ~%r10)
-         | PostDec -> assert false
+         | PostDec -> subq ~$1 (addr ~%r10)
          | Not -> assert false (*comment "not" ++ notq ~%r11*)
      end
     ++ pushq (addr ~%r10)

@@ -101,6 +101,8 @@ rule token = parse
   | "]"              { R_SQ_BRACKET }
   | "//"             { comment_line lexbuf }
   | "\""             { Buffer.reset string_buffer; CONST_STRING(string lexbuf) }
+  | "'" simple_char "'" { CONST_CHAR (lexeme_char lexbuf 0) }
+  | "'" complexe_char "'" { CONST_CHAR (String.get (process_char (lexeme lexbuf)) 0) }
   | (['-'])? digit+ (['u'] | ['U']) (['l'] | ['L']) { UNSIGNED_LONG_NUM (int64_of_number_string (lexeme lexbuf) 2) }
   | ['-']? digit+ (['l'] | ['L']) { LONG_NUM (int64_of_number_string (lexeme lexbuf) 1) }
   | digit+ (['u'] | ['U']) { UNSIGNED_NUM (int64_of_number_string (lexeme lexbuf) 1) }
@@ -115,6 +117,10 @@ and string = parse
            | complexe_char { Buffer.add_string string_buffer (process_char (lexeme lexbuf));  string lexbuf }
            | "\""          { Buffer.contents string_buffer }
            | _             { raise (Lexical_error "Invalid character") }
+
+and chara = parse
+          | simple_char { (lexeme lexbuf) }
+          | complexe_char { (process_char (lexeme lexbuf)) }
 
 and comment_line = parse
                  | _            { comment_line lexbuf }
