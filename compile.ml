@@ -160,9 +160,11 @@ and compile_expr_reg env e =
          match op, e1.info with
          | Add, Tdouble -> addsd ~%xmm0 ~%xmm1
          | Add, Tinteger(_, _) -> addq ~%r11 ~%r10
+         | Minus, Tdouble -> subsd ~%xmm1 ~%xmm0
          | Minus, Tinteger(_,_) -> subq ~%r11 ~%r10
+         | Mult, Tdouble       -> mulsd ~%xmm1 ~%xmm0
          | Mult, Tinteger(_,_) -> imulq ~%r11 ~%r10
-         | Div, Tdouble -> divsd ~%xmm0 ~%xmm1
+         | Div, Tdouble -> divsd ~%xmm1 ~%xmm0
          | Div, Tinteger(_,_) | Mod, Tinteger(_,_) ->
             let rsize = reg_size_of e1.info in
             let ra = rax_ rsize in
@@ -192,12 +194,13 @@ and compile_expr_reg env e =
          | Gt, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jl
          | Dot, Tinteger(_,_) -> failwith "todo binop dot"
          | Arrow, Tinteger(_,_) -> failwith "todo binop arrow"
+         | _, Tdouble -> failwith "unknown double binop"
          | _, _ -> failwith "unknown binop"
        end
      ++
        begin
          match e1.info with
-         | Tdouble -> divsd ~%xmm0 ~%xmm1
+         | Tdouble -> movq ~%xmm0 ~%r10
          | _ -> nop
        end
 
@@ -315,8 +318,8 @@ let rec compile_instr lab_fin rbp_offset env i =
      rbp_offset,
      comment "if" ++
        cond ++
-       popq ~%r10 ++
-       test ~%r10 ~%r10 ++
+       (*popq ~%r10 ++
+       test ~%r10 ~%r10 ++*)
        je e ++
        b1 ++
        jmp if_end ++
@@ -335,8 +338,7 @@ let rec compile_instr lab_fin rbp_offset env i =
      cond_init ++
        label for_label ++
        cond ++
-       popq ~%r10 ++
-       cmpq ~$0 ~%r10 ++
+       test ~%r10 ~%r10 ++
        je for_end ++
        b ++
        cond_change ++
