@@ -149,16 +149,21 @@ and compile_expr_reg env e =
        e2code ++ (* e2 dans r10 *)
        popq ~%r11 ++(* e1 dans r11 *)
        begin
-         match op with
-         | Add -> addq ~%r11 ~%r10
-         | Minus -> subq ~%r11 ~%r10
-         | Mult -> imulq ~%r11 ~%r10
-         | Div when type_eq e1.info Tdouble ->
-            movq ~%r10 ~%xmm0 ++
-              movq ~%r11 ~%xmm1 ++
-              divsd ~%xmm0 ~%xmm1 ++
-              movq ~%xmm1 ~%r10
-         | Div | Mod ->
+       match e1.info with
+       | Tdouble ->
+          movq ~%r10 ~%xmm0 ++
+            movq ~%r11 ~%xmm1
+       | _ -> nop
+       end
+     ++
+       begin
+         match op, e1.info with
+         | Add, Tdouble -> addsd ~%xmm0 ~%xmm1
+         | Add, Tinteger(_, _) -> addq ~%r11 ~%r10
+         | Minus, Tinteger(_,_) -> subq ~%r11 ~%r10
+         | Mult, Tinteger(_,_) -> imulq ~%r11 ~%r10
+         | Div, Tdouble -> divsd ~%xmm0 ~%xmm1
+         | Div, Tinteger(_,_) | Mod, Tinteger(_,_) ->
             let rsize = reg_size_of e1.info in
             let ra = rax_ rsize in
             let rd = rdx_ rsize in
@@ -177,18 +182,25 @@ and compile_expr_reg env e =
                     else divl ~%r10d)
               )
             ++ (if op = Div then mov ~%ra ~%re2 else mov ~%rd ~%re2)
-         | And -> failwith "todo binop and"
-         | Or -> failwith "todo binop or"
-         | Eq -> cmpq ~%r10 ~%r11 ++ comp_res je
-         | Neq -> cmpq ~%r10 ~%r11 ++ comp_res jne
-         | Lt -> cmpq ~%r10 ~%r11 ++ comp_res jl
-         | Le -> cmpq ~%r10 ~%r11 ++ comp_res jle
-         | Ge -> cmpq ~%r10 ~%r11 ++ comp_res jg
-         | Gt -> cmpq ~%r10 ~%r11 ++ comp_res jge
-         | Dot -> failwith "todo binop dot"
-         | Arrow -> failwith "todo binop arrow"
-         | _ -> failwith "unknown binop"
+         | And, Tinteger(_,_) -> andq ~%r11 ~%r10
+         | Or, Tinteger(_,_) -> orq ~%r11 ~%r10
+         | Eq, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jne
+         | Neq, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res je
+         | Lt, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jg
+         | Le, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jge
+         | Ge, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jle
+         | Gt, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jl
+         | Dot, Tinteger(_,_) -> failwith "todo binop dot"
+         | Arrow, Tinteger(_,_) -> failwith "todo binop arrow"
+         | _, _ -> failwith "unknown binop"
        end
+     ++
+       begin
+         match e1.info with
+         | Tdouble -> divsd ~%xmm0 ~%xmm1
+         | _ -> nop
+       end
+
   | Eunop (unop , e0) ->
      begin
        let ecode = compile_lvalue_reg env e0 in
@@ -199,11 +211,11 @@ and compile_expr_reg env e =
          | Deref -> assert false
          | Pos -> assert false
          | Addr -> assert false
-         | PreInc -> assert false
-         | PreDec -> assert false
-         | PostInc -> comment "++" ++ addq ~$1 (addr ~%r10)
+         | PreInc -> addq ~$1 (addr ~%r10)
+         | PreDec -> subq ~$1 (addr ~%r10)
+         | PostInc -> addq ~$1 (addr ~%r10)
          | PostDec -> subq ~$1 (addr ~%r10)
-         | Not -> assert false (*comment "not" ++ notq ~%r11*)
+         | Not -> notq (addr ~%r10)
      end
     ++ pushq (addr ~%r10)
      ++ comment "end unop"
@@ -303,6 +315,8 @@ let rec compile_instr lab_fin rbp_offset env i =
      rbp_offset,
      comment "if" ++
        cond ++
+       popq ~%r10 ++
+       test ~%r10 ~%r10 ++
        je e ++
        b1 ++
        jmp if_end ++
@@ -311,16 +325,17 @@ let rec compile_instr lab_fin rbp_offset env i =
        label if_end ++
        comment "end if"
   | Sfor (e1, e2, e3, i) ->
+     let for_label = new_label "for" in
+     let for_end = new_label "for_end" in
      let cond_init = match e1 with | Some e1 -> compile_expr_list env e1 | None -> nop in
      let cond = match e2 with | Some e2 -> compile_expr env e2 | None -> pushq ~$1 in
      let cond_change = match e3 with | Some e3 -> compile_expr_list env e3 | None -> nop in
      let rbp_offset, b = compile_instr lab_fin rbp_offset env i in
-     let for_label = new_label "for" in
-     let for_end = new_label "for_end" in
      rbp_offset,
      cond_init ++
        label for_label ++
        cond ++
+       popq ~%r10 ++
        cmpq ~$0 ~%r10 ++
        je for_end ++
        b ++
