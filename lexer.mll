@@ -45,11 +45,11 @@
 
   let process_char c =
     match c with
-    | "\\n" -> "\n"
-    | "\\t" -> "\t"
-    | "\\r" -> "\r"
-    | "\\\\"  -> "\\"
-    | _ as s -> print_string ("["^s^"]"); s
+    | "\\n" -> '\n'
+    | "\\t" -> '\t'
+    | "\\r" -> '\r'
+    | "\\\\"  -> '\\'
+    | _ as s -> print_string ("["^s^"]"); ' '
 
   let string_buffer = Buffer.create 80
 
@@ -59,7 +59,7 @@ let digit = ['0'-'9']
 let alpha = ['a'-'z' 'A'-'Z']
 let identifier = (alpha | ['_']) (alpha | digit | ['_'])*
 let const_float = (digit+ ['.'] digit* | ['.']digit+)((['e'] | ['E'])['-']?digit+)?
-let simple_char = [' '-'~']#['\'' '\\' '\"']
+let simple_char = [' '-'~']#['\'' '\\' '\"'] | digit
 let complexe_char = ['\\'] (['\\'] | ['n'] | ['t'] | ['r'])
 let const_string = ['"'] (simple_char | complexe_char)* ['"']
 
@@ -101,8 +101,8 @@ rule token = parse
   | "]"              { R_SQ_BRACKET }
   | "//"             { comment_line lexbuf }
   | "\""             { Buffer.reset string_buffer; CONST_STRING(string lexbuf) }
-  | "'" simple_char "'" { CONST_CHAR (lexeme_char lexbuf 0) }
-  | "'" complexe_char "'" { CONST_CHAR (String.get (process_char (lexeme lexbuf)) 0) }
+  | "'" simple_char "'" { CONST_CHAR (lexeme_char lexbuf 1) }
+  | "'" complexe_char "'" { CONST_CHAR (process_char (lexeme lexbuf)) }
   | (['-'])? digit+ (['u'] | ['U']) (['l'] | ['L']) { UNSIGNED_LONG_NUM (int64_of_number_string (lexeme lexbuf) 2) }
   | ['-']? digit+ (['l'] | ['L']) { LONG_NUM (int64_of_number_string (lexeme lexbuf) 1) }
   | digit+ (['u'] | ['U']) { UNSIGNED_NUM (int64_of_number_string (lexeme lexbuf) 1) }
@@ -114,13 +114,9 @@ rule token = parse
 and string = parse
            (* TODO: changer les char en leur valeur pour que ce soit correctement interprété *)
            | simple_char   { Buffer.add_string string_buffer (lexeme lexbuf); string lexbuf }
-           | complexe_char { Buffer.add_string string_buffer (process_char (lexeme lexbuf));  string lexbuf }
+           | complexe_char { Buffer.add_char string_buffer (process_char (lexeme lexbuf));  string lexbuf }
            | "\""          { Buffer.contents string_buffer }
            | _             { raise (Lexical_error "Invalid character") }
-
-and chara = parse
-          | simple_char { (lexeme lexbuf) }
-          | complexe_char { (process_char (lexeme lexbuf)) }
 
 and comment_line = parse
                  | _            { comment_line lexbuf }
