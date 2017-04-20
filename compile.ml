@@ -135,13 +135,17 @@ and compile_expr_reg env e =
      let e1_code = compile_lvalue_reg env e1 in
      let e2_code = compile_expr env e2 in
      let reg = r11_ (reg_size_of e1.info) in
-     comment "assign" ++
-       e2_code ++
+     e2_code ++
        e1_code ++
        popq ~%r11 ++
        mov ~%reg (addr ~%r10) ++
-       movq ~%r11 ~%r10 ++
-       comment "end assign"
+       movq (addr ~%r10) ~%r10 ++
+       (* BUG AVEC LES FLOTTANTS? *)
+       begin
+       match e1.info with
+       | Tdouble -> nop
+       | _ -> pushq ~%r10
+       end
   | Ebinop(e1, op, e2) ->
      let e1code = compile_expr env e1 in
      let e2code = compile_expr_reg env e2 in
@@ -207,21 +211,19 @@ and compile_expr_reg env e =
   | Eunop (unop , e0) ->
      begin
        let ecode = compile_lvalue_reg env e0 in
-       comment "unop" ++
          ecode ++
          match unop with
-         | Neg -> assert false (*comment "neg" ++ negq ~%r10*)
+         | Neg -> movq (addr ~%r10) ~%r10 ++ negq ~%r10 ++ pushq ~%r10
          | Deref -> assert false
          | Pos -> assert false
          | Addr -> assert false
-         | PreInc -> addq ~$1 (addr ~%r10)
-         | PreDec -> subq ~$1 (addr ~%r10)
-         | PostInc -> addq ~$1 (addr ~%r10)
-         | PostDec -> subq ~$1 (addr ~%r10)
+         | PreInc -> addq ~$1 (addr ~%r10) ++ pushq (addr ~%r10)
+         | PreDec -> subq ~$1 (addr ~%r10) ++ pushq (addr ~%r10)
+         | PostInc -> addq ~$1 (addr ~%r10) ++ pushq (addr ~%r10)
+         | PostDec -> subq ~$1 (addr ~%r10) ++ pushq (addr ~%r10)
          | Not -> notq (addr ~%r10)
      end
-    ++ pushq (addr ~%r10)
-     ++ comment "end unop"
+
   | Ecall (f, params) ->
      let tret,_,_, extern = Hashtbl.find fun_env f.node in
      if extern then
@@ -251,7 +253,6 @@ and compile_expr_reg env e =
 and compile_lvalue_reg env e =
   match e.node with
   | Eident e ->
-     comment "Eident" ++
        begin
          try
 	   let offset = Env.find e.node env in
@@ -259,29 +260,23 @@ and compile_lvalue_reg env e =
          with Not_found ->
 	   movq ~:(e.node) ~%r10
        end
-     ++ comment "f Eident"
-  | Eunop(Deref, e) -> failwith "todo"
+  | Eunop(Deref, e) -> compile_expr_reg env e
   | Egetarr (e, i) -> failwith "todo"
   | _ -> failwith "todo"
 
 and compile_expr env e =
   match e.info with
   | Tstruct _ -> failwith "On gère pas les structures"
-  | Tvoid -> comment "void" ++ compile_expr_reg env e ++ comment "tvoid"
+  | Tvoid -> compile_expr_reg env e
   | t when size_of t = 8 ->
-     comment "8 octets" ++
        compile_expr_reg env e ++
        pushq ~%r10 ++
-       comment "f 8 octets"
   | t ->
      let n = size_of t in
      let mask = (1 lsl (n*8)) -1 in
-     comment "less than 8 octet" ++
        compile_expr_reg env e ++
-       comment "mask" ++
        andq ~$mask ~%r10 ++
        pushq ~%r10 ++
-       comment "f less than 8 octer"
 
 and compile_clean_expr env e =
   let ecode = compile_expr env e in
@@ -295,18 +290,19 @@ and compile_expr_list env elist =
 
 let rec compile_instr lab_fin rbp_offset env i =
   match i.node with
-  | Sskip -> rbp_offset, nop ++ comment "skip"
-  | Sexpr e -> rbp_offset, comment "sexpr" ++ compile_clean_expr env e ++ comment "f sexpr"
+  | Sskip -> rbp_offset, nop
+  | Sexpr e -> rbp_offset, compile_clean_expr env e
   | Sblock b -> let off, c = compile_block lab_fin rbp_offset env b in
-                off, comment "block" ++ c ++ comment "f block"
+                off, c
   | Sreturn oe ->
-     rbp_offset, comment "return" ++ (
+     rbp_offset,
+     begin
        match oe with
        | None -> nop
        | Some e -> compile_expr env e
-     ) ++ jmp lab_fin ++ comment "f return"
+     end ++ jmp lab_fin
   | Sif (e, i1, i2) ->
-     let cond = comment "condition if" ++ compile_expr env e ++ comment "fin condition if" in
+     let cond = compile_expr env e in
      let e = new_label "else" in
      let if_end = new_label "if_end" in
      let rbp_offset, b1 = compile_instr lab_fin rbp_offset env i1 in
@@ -316,7 +312,6 @@ let rec compile_instr lab_fin rbp_offset env i =
        | None -> rbp_offset, nop
      in
      rbp_offset,
-     comment "if" ++
        cond ++
        (*popq ~%r10 ++
        test ~%r10 ~%r10 ++*)
@@ -326,7 +321,6 @@ let rec compile_instr lab_fin rbp_offset env i =
        label e ++
        b2 ++
        label if_end ++
-       comment "end if"
   | Sfor (e1, e2, e3, i) ->
      let for_label = new_label "for" in
      let for_end = new_label "for_end" in

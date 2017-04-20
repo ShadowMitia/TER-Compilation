@@ -119,15 +119,15 @@ and string = parse
            | _             { raise (Lexical_error "Invalid character") }
 
 and comment_line = parse
-                 | _            { comment_line lexbuf }
                  | ['\n' '\r']+ { token lexbuf }
                  | eof          { token lexbuf }
+                 | _            { comment_line lexbuf }
 
 and comment = parse
             | "*/" { token lexbuf }
-            | _    { comment lexbuf }
             | "/*" { raise (Lexical_error "Imbricated comments are forbiden") }
             | eof  { raise (Lexical_error "Unterminated comment") }
+            | _    { comment lexbuf }
 
 and macro = parse
           | _             { macro lexbuf }
