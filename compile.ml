@@ -99,12 +99,15 @@ let is_signed t = match t with
 let comp_res comp =
   let lf = new_label "cond" in
   let le = new_label "cond_end" in
+  comment "horrible if management" ++
   comp lf ++
-    movq ~$0 ~%r10 ++
+    xorq ~%r10 ~%r10 ++
+    inc ~%r10 ++
     jmp le ++
     label lf ++
-    movq ~$1 ~%r10 ++
-    label le
+    xorq ~%r10 ~%r10 ++
+    label le ++
+    comment "horrible if management end"
 
 
 let rec assign_regs env args iregs dregs (d_acc, code_acc) =
@@ -192,10 +195,10 @@ and compile_expr_reg env e =
          | Or, Tinteger(_,_) -> orq ~%r11 ~%r10
          | Eq, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jne
          | Neq, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res je
-         | Lt, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jg
-         | Le, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jge
-         | Ge, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jle
-         | Gt, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jl
+         | Lt, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jge
+         | Le, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jg
+         | Ge, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jl
+         | Gt, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jle
          | Dot, Tinteger(_,_) -> failwith "todo binop dot"
          | Arrow, Tinteger(_,_) -> failwith "todo binop arrow"
          | _, Tdouble -> failwith "unknown double binop"
@@ -221,7 +224,7 @@ and compile_expr_reg env e =
          | PreDec -> subq ~$1 (addr ~%r10) ++ pushq (addr ~%r10)
          | PostInc -> addq ~$1 (addr ~%r10) ++ pushq (addr ~%r10)
          | PostDec -> subq ~$1 (addr ~%r10) ++ pushq (addr ~%r10)
-         | Not -> notq (addr ~%r10)
+         | Not -> notq (addr ~%r10) ++ pushq (addr ~%r10)
      end
 
   | Ecall (f, params) ->
@@ -268,15 +271,16 @@ and compile_expr env e =
   match e.info with
   | Tstruct _ -> failwith "On gère pas les structures"
   | Tvoid -> compile_expr_reg env e
-  | t when size_of t = 8 ->
-       compile_expr_reg env e ++
-       pushq ~%r10 ++
   | t ->
-     let n = size_of t in
-     let mask = (1 lsl (n*8)) -1 in
+     if size_of t = 8 then
        compile_expr_reg env e ++
-       andq ~$mask ~%r10 ++
-       pushq ~%r10 ++
+         pushq ~%r10
+     else
+       let n = size_of t in
+       let mask = (1 lsl (n*8)) -1 in
+       compile_expr_reg env e ++
+         andq ~$mask ~%r10 ++
+         pushq ~%r10
 
 and compile_clean_expr env e =
   let ecode = compile_expr env e in
@@ -320,7 +324,7 @@ let rec compile_instr lab_fin rbp_offset env i =
        jmp if_end ++
        label e ++
        b2 ++
-       label if_end ++
+       label if_end
   | Sfor (e1, e2, e3, i) ->
      let for_label = new_label "for" in
      let for_end = new_label "for_end" in
