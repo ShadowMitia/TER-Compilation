@@ -12,3 +12,4 @@ minic
 minic.opt
 depend
 *.s
+*.exe
