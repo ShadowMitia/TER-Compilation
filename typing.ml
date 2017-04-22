@@ -6,6 +6,8 @@ let global_env = Hashtbl.create 17
 let struct_env = Hashtbl.create 17
 let fun_env = Hashtbl.create 17
 
+let cur_analyse_fun = ref ("", false)
+
 let mk_node t e = { info = t; node = e }
 
 let compatible t1 t2 =
@@ -84,6 +86,7 @@ let is_double t =
   match t with
   | Tdouble -> true
   | _ -> false
+
 
 exception TypeError of loc * string
 
@@ -231,6 +234,8 @@ let rec type_expr env e =
                               mk_node te0.info (Egetarr(te0, te1))
 
   | Ecall (f, params) ->
+     let name, boo = !cur_analyse_fun in
+     if name = f.node then cur_analyse_fun := (name, true);
      let tparams = List.map (type_expr env) params in
      begin
        try
@@ -335,7 +340,6 @@ and type_block t env (var_decl, instrs) =
   let ti = List.map (type_instr t new_env) instrs in
   (tvd, ti)
 
-
 let type_decl d =
   match d with
   | Dvar (t, i) -> if type_bf t && t <> Tvoid then
@@ -346,20 +350,24 @@ let type_decl d =
      let t_var_decl = type_var_decl var_decl in
      Dstruct(id, t_var_decl)
 
-  | Dfun (t, f, params, b) ->
+  | Dfun (t, f, params, b, is_rec) ->
      if not (type_bf t) then error f.info "Type de retour invalide"
-     else begin
+     else
+       begin
 	 add_global_env fun_env f (t, f, params, b = None);
 	 let t_params = type_var_decl params in
-	 let t_block = match b with
-	   | None -> None
-	   | Some block -> let env = add_env Env.empty params in
+	 let t_block, is_rec = match b with
+	   | None -> None, false
+	   | Some block -> cur_analyse_fun := (f.node, false) ;
+                           let env = add_env Env.empty params in
 			   let t_block = type_block t env block in
-			   Some t_block
+                           let _, is_rec = !cur_analyse_fun in
+                           cur_analyse_fun := ("", false);
+			   Some t_block, is_rec
 	 in
-	 Dfun(t, f, t_params, t_block)
+	 Dfun(t, f, t_params, t_block, is_rec)
        end
 
 let type_prog l =
-  print_int (List.length l); List.map (type_decl) l;
+  List.map (type_decl) l;
   (*Helpers.print_fun_env fun_env*)

@@ -2,11 +2,18 @@ open Ast
 open Amd64
 open Typing
 
+(* Variables pour stocker les data de type string et double *)
 let string_env = Hashtbl.create 17
 let double_env = Hashtbl.create 17
 
+(* Structure pour stocker le code des fonctions pour les inliner *)
+(* let fun_inline = Hashtbl.create 17 *)
+
+(* Registres int et double utilisé pour le passage de paramètres *)
 let int_registers = [rdi; rsi; rdx; rcx; r8; r9]
-let double_registers = [ xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7]
+let double_registers = [xmm0; xmm1; xmm2; xmm3; xmm4; xmm5; xmm6; xmm7]
+
+let compiler_modes = ref { inline = false}
 
 (* Helper pour générer un label dans le code assembleur *)
 let new_label =
@@ -22,13 +29,9 @@ let size_of t =
   | Tinteger (_, Short) -> 2
   | Tinteger (_, Int) -> 4
   | Tinteger (_, Long) | Tdouble | Tpointer _ -> 8
-  | Tstruct _ -> assert false
+  | Tstruct _ -> failwith "todo sizeof struct"
 
-let align_of t =
-  match t with
-  | Tstruct _ -> assert false
-  | _ -> size_of t
-
+(* Donne l'arrondi au multiple de 8 plus grand le plus proche *)
 let round8 n  =
   if n mod 8 = 0 then n else ((n/8) + 1) * 8
 
@@ -60,6 +63,7 @@ let compile_const c =
      mov ~:label ~%r10 ++
        mov (addr ~%r10) ~%r10
 
+(* helper pour mapper les taille d'octet au suffixe des commandes assembleurs de certains fonction d'amd64.ml *)
 let reg_size_of t =
   match size_of t with
   | 1 -> `b
@@ -90,12 +94,22 @@ let compile_cast tfrom tto =
   | Tinteger (Unsigned, Short), Tinteger(_, Long) -> movzwq ~%r10w ~%r10
   | Tinteger (Signed, Int), Tinteger(_, Long) -> movslq ~%r10d ~%r10
   | Tinteger (Unsigned, Int), Tinteger(_, Long) -> andq ~$0xffffffff ~%r10
+  | Tinteger (Signed, Char), Tdouble -> cvtsi2sd ~%r10d ~%xmm0 ++ movq ~%xmm0 ~%r10
+  | Tinteger (Unsigned, Char), Tdouble -> cvtsi2sd ~%r10d ~%xmm0  ++ movq ~%xmm0 ~%r10
+  | Tinteger (Signed, Short), Tdouble -> cvtsi2sd ~%r10d ~%xmm0  ++ movq ~%xmm0 ~%r10
+  | Tinteger (Unsigned, Short), Tdouble -> cvtsi2sd ~%r10d ~%xmm0  ++ movq ~%xmm0 ~%r10
+  | Tinteger (Signed, Int), Tdouble -> cvtsi2sd ~%r10d ~%xmm0  ++ movq ~%xmm0 ~%r10
+  | Tinteger (Unsigned, Int), Tdouble -> cvtsi2sd ~%r10d ~%xmm0  ++ movq ~%xmm0 ~%r10
+  | Tinteger (Signed, Long), Tdouble -> cvtsi2sdq ~%r10 ~%xmm0  ++ movq ~%xmm0 ~%r10
+  | Tinteger (Unsigned, Long), Tdouble -> cvtsi2sdq ~%r10 ~%xmm0  ++ movq ~%xmm0 ~%r10
   | _ -> failwith ("Error type")
 
 let is_signed t = match t with
   | Tinteger (Signed, _) | Tpointer _ | Tnull -> true
   | _ -> false
 
+
+(* TODO: rendre plus propre *)
 let comp_res comp =
   let lf = new_label "cond" in
   let le = new_label "cond_end" in
@@ -142,7 +156,7 @@ and compile_expr_reg env e =
        e1_code ++
        popq ~%r11 ++
        mov ~%reg (addr ~%r10) ++
-       movq (addr ~%r10) ~%r10 ++
+       mov (addr ~%r10) ~%r10 ++
        (* BUG AVEC LES FLOTTANTS? *)
        begin
        match e1.info with
@@ -195,9 +209,13 @@ and compile_expr_reg env e =
          | Or, Tinteger(_,_) -> orq ~%r11 ~%r10
          | Eq, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jne
          | Neq, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res je
+         | Lt, Tdouble -> ucomisd ~%xmm0 ~%xmm1 ++ comp_res ja
          | Lt, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jge
+         | Le, Tdouble -> ucomisd ~%xmm0 ~%xmm1 ++ comp_res jae
          | Le, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jg
+         | Ge, Tdouble -> ucomisd ~%xmm0 ~%xmm11 ++ comp_res jb
          | Ge, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jl
+         | Gt, Tdouble -> ucomisd ~%xmm0 ~%xmm1 ++ comp_res jbe
          | Gt, Tinteger(_,_) -> cmpq ~%r10 ~%r11 ++ comp_res jle
          | Dot, Tinteger(_,_) -> failwith "todo binop dot"
          | Arrow, Tinteger(_,_) -> failwith "todo binop arrow"
@@ -238,19 +256,25 @@ and compile_expr_reg env e =
          call f.node ++
          mov ~%rax ~%r10
      else
-       let size_ret = round8 (size_of tret) in
-       let arg_size, arg_code =
-	 List.fold_left (fun (a_size, a_code) e ->
-	     (a_size + round8 (size_of e.info),
-	      compile_expr env e ++ a_code)
-	   ) (0, nop) params
-       in
-       subq ~$size_ret ~%rsp ++
-	 arg_code ++
-	 call f.node ++
-	 addq ~$arg_size ~%rsp ++
-         if (tret <> Tvoid) then popq ~%r10 else nop
-  | Esizeof t -> failwith "todo"
+       begin
+         match !(compiler_modes).inline with
+         | false ->
+            let size_ret = round8 (size_of tret) in
+            let arg_size, arg_code =
+	      List.fold_left (fun (a_size, a_code) e ->
+	          (a_size + round8 (size_of e.info),
+	           compile_expr env e ++ a_code)
+	        ) (0, nop) params
+            in
+            subq ~$size_ret ~%rsp ++
+	      arg_code ++
+	      call f.node ++
+	      addq ~$arg_size ~%rsp ++
+              if (tret <> Tvoid) then popq ~%r10 else nop
+         | true ->
+            failwith "inline TODO"
+       end
+  | Esizeof t -> failwith "sizeof TODO"
 (*|_ -> compile_lvalue_reg env e*)
 
 and compile_lvalue_reg env e =
@@ -264,8 +288,8 @@ and compile_lvalue_reg env e =
 	   movq ~:(e.node) ~%r10
        end
   | Eunop(Deref, e) -> compile_expr_reg env e
-  | Egetarr (e, i) -> failwith "todo"
-  | _ -> failwith "todo"
+  | Egetarr (e, i) -> failwith "todo lvalue_reg getarr"
+  | _ -> failwith "todo lvalue_reg"
 
 and compile_expr env e =
   match e.info with
@@ -365,13 +389,13 @@ let compile_decl (atext, adata) d =
   | Dvar (t, id) ->
      atext,
      let n = size_of t in
-     let a = align_of t in
+     let a = match t with | Tstruct _ -> assert false | _ -> size_of t in
      adata ++
        label id.node ++
        align a ++
        space n
-  | Dfun (_, _, _, None) -> atext, adata
-  | Dfun (tret, f, params, Some body) ->
+  | Dfun (_, _, _, None, _) -> atext, adata
+  | Dfun (tret, f, params, Some body, is_rec) ->
      let last_offset, env =
        List.fold_left (fun (aoffset, aenv) (t, x) ->
            let aenv = Env.add x.node aoffset aenv in
@@ -389,7 +413,6 @@ let compile_decl (atext, adata) d =
          pushq ~%rbp ++
          mov ~%rsp ~%rbp ++
          body_code ++
-
          label lab_fin ++
          (if (tret <> Tvoid) then
             if f.node = "main" then popq ~%rax
@@ -403,7 +426,8 @@ let compile_decl (atext, adata) d =
      in
      atext ++ code, adata
 
-let compile_prog p =
+let compile_prog p args =
+  compiler_modes := args;
   let text, data =
     List.fold_left compile_decl (nop, nop) p
   in

@@ -1,3 +1,8 @@
+
+
+type param_args = { mutable inline : bool}
+
+
 (* Arbres de syntaxe abstraite *)
 
 type ('info, 'node) node = { info : 'info;
@@ -55,7 +60,7 @@ and 'info block =
     var_decl list * 'info statement list
 
 type 'info decl =
-  | Dfun of c_type * ident * var_decl list * ('info block option)
+  | Dfun of c_type * ident * var_decl list * ('info block option) * bool
   | Dvar of var_decl
   | Dstruct of ident * var_decl list
 
