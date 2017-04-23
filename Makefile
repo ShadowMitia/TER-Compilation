@@ -4,7 +4,7 @@
 # a.ml, a.ml doit se trouver avant dans la liste.
 #
 
-SOURCES = ast.mli parser.mly lexer.mll typing.ml amd64.ml compile.ml main.ml
+SOURCES = analysis.ml ast.mli parser.mly lexer.mll typing.ml amd64.ml compile.ml main.ml
 
 # Nom du binaire
 
@@ -103,7 +103,8 @@ depend: $(SMLIYL)
 
 # Tests unitaires (pas portable probablement...)
 
-.PHONY: test
+.PHONY: test tests
 
 test:
+tests:
 	@cd tests && $(MAKE) -i

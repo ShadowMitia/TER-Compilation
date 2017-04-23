@@ -1,7 +1,4 @@
-
-
-type param_args = { mutable inline : bool}
-
+open Analysis
 
 (* Arbres de syntaxe abstraite *)
 
@@ -60,7 +57,7 @@ and 'info block =
     var_decl list * 'info statement list
 
 type 'info decl =
-  | Dfun of c_type * ident * var_decl list * ('info block option) * bool
+  | Dfun of c_type * ident * var_decl list * ('info block option) * fun_analyse
   | Dvar of var_decl
   | Dstruct of ident * var_decl list
 

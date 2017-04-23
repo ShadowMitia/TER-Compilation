@@ -1,6 +1,7 @@
 open Ast
 open Amd64
 open Typing
+open Analysis
 
 (* Variables pour stocker les data de type string et double *)
 let string_env = Hashtbl.create 17
@@ -256,9 +257,6 @@ and compile_expr_reg env e =
          call f.node ++
          mov ~%rax ~%r10
      else
-       begin
-         match !(compiler_modes).inline with
-         | false ->
             let size_ret = round8 (size_of tret) in
             let arg_size, arg_code =
 	      List.fold_left (fun (a_size, a_code) e ->
@@ -271,9 +269,6 @@ and compile_expr_reg env e =
 	      call f.node ++
 	      addq ~$arg_size ~%rsp ++
               if (tret <> Tvoid) then popq ~%r10 else nop
-         | true ->
-            failwith "inline TODO"
-       end
   | Esizeof t -> failwith "sizeof TODO"
 (*|_ -> compile_lvalue_reg env e*)
 
@@ -395,7 +390,9 @@ let compile_decl (atext, adata) d =
        align a ++
        space n
   | Dfun (_, _, _, None, _) -> atext, adata
-  | Dfun (tret, f, params, Some body, is_rec) ->
+  | Dfun (tret, f, params, Some body, fun_ana) ->
+     if fun_ana.is_empty then print_string "Empty function";
+     if fun_ana.is_rec then print_string "Recursive function";
      let last_offset, env =
        List.fold_left (fun (aoffset, aenv) (t, x) ->
            let aenv = Env.add x.node aoffset aenv in

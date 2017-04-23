@@ -6,6 +6,7 @@ open Lexer
 open Parser
 open Ast
 open Typing
+open Analysis
 
 
 let usage = "usage: compilo [options] file.c"
@@ -13,6 +14,7 @@ let usage = "usage: compilo [options] file.c"
 let parse_only = ref false
 let type_only = ref false
 let inline_mode = ref false
+let compiler_params = ref (mk_compiler_param())
 
 let spec =
   ["-parse-only", Arg.Set parse_only, "  stops after parsing";
@@ -48,10 +50,8 @@ let () =
     if !parse_only then exit 0;
     let tp = Typing.type_prog p in ();
                                    if !type_only then exit 0;
-                                   let compiler_args = {
-                                       inline = !inline_mode
-                                     } in
-    let code = Compile.compile_prog tp compiler_args in
+                                   !(compiler_params).inline <- !inline_mode;
+    let code = Compile.compile_prog tp !compiler_params in
     let out_file = Filename.chop_suffix file ".c" in
     Amd64.print_in_file ~file:(out_file ^ ".s") code
   with

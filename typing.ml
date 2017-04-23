@@ -1,4 +1,5 @@
 open Ast
+open Analysis
 
 module Env = Map.Make(String)
 
@@ -6,7 +7,8 @@ let global_env = Hashtbl.create 17
 let struct_env = Hashtbl.create 17
 let fun_env = Hashtbl.create 17
 
-let cur_analyse_fun = ref ("", false)
+let cur_analyse_fun = ref ("",  mk_fun_analysis())
+
 
 let mk_node t e = { info = t; node = e }
 
@@ -234,8 +236,8 @@ let rec type_expr env e =
                               mk_node te0.info (Egetarr(te0, te1))
 
   | Ecall (f, params) ->
-     let name, boo = !cur_analyse_fun in
-     if name = f.node then cur_analyse_fun := (name, true);
+     let name, ana = !cur_analyse_fun in
+     if name = f.node then ana.is_rec <- true;
      let tparams = List.map (type_expr env) params in
      begin
        try
@@ -350,22 +352,33 @@ let type_decl d =
      let t_var_decl = type_var_decl var_decl in
      Dstruct(id, t_var_decl)
 
-  | Dfun (t, f, params, b, is_rec) ->
+  | Dfun (t, f, params, b, fun_ana) ->
      if not (type_bf t) then error f.info "Type de retour invalide"
      else
        begin
 	 add_global_env fun_env f (t, f, params, b = None);
 	 let t_params = type_var_decl params in
-	 let t_block, is_rec = match b with
-	   | None -> None, false
-	   | Some block -> cur_analyse_fun := (f.node, false) ;
+	 let t_block, fun_ana = match b with
+	   | None -> None, fun_ana
+	   | Some block -> cur_analyse_fun := (f.node, fun_ana) ;
                            let env = add_env Env.empty params in
 			   let t_block = type_block t env block in
-                           let _, is_rec = !cur_analyse_fun in
-                           cur_analyse_fun := ("", false);
-			   Some t_block, is_rec
+                           let _, fun_ana = !cur_analyse_fun in
+                           cur_analyse_fun := ("", mk_fun_analysis());
+			   Some t_block, fun_ana
 	 in
-	 Dfun(t, f, t_params, t_block, is_rec)
+         begin
+           match t_block with
+           | Some (vars, instrs) -> if List.length instrs = 1 then
+                         begin
+                           match (List.nth instrs 0).node with
+                           | Sskip -> print_string "Sskip"; fun_ana.is_empty <- true
+                           | _ -> ()
+                         end
+                                    else if List.length instrs = 0 then fun_ana.is_empty <- true
+           | _ -> ()
+         end;
+	 Dfun(t, f, t_params, t_block, fun_ana)
        end
 
 let type_prog l =
