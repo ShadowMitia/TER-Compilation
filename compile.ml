@@ -7,8 +7,7 @@ open Analysis
 let string_env = Hashtbl.create 17
 let double_env = Hashtbl.create 17
 
-(* Structure pour stocker le code des fonctions pour les inliner *)
-(* let fun_inline = Hashtbl.create 17 *)
+let inline_fun = Hashtbl.create 17
 
 (* Registres int et double utilisé pour le passage de paramètres *)
 let int_registers = [rdi; rsi; rdx; rcx; r8; r9]
@@ -245,10 +244,9 @@ and compile_expr_reg env e =
          | PostDec -> subq ~$1 (addr ~%r10) ++ pushq (addr ~%r10)
          | Not -> notq (addr ~%r10) ++ pushq (addr ~%r10)
      end
-
   | Ecall (f, params) ->
-     let tret,_,_, extern = Hashtbl.find fun_env f.node in
-     if extern then
+     let tret, _, _, fun_ana = Hashtbl.find fun_env f.node in
+     if fun_ana.is_extern then
        let n_double, arg_code =
          assign_regs env params int_registers double_registers (0, nop)
        in
@@ -256,7 +254,12 @@ and compile_expr_reg env e =
          mov ~$n_double ~%rax ++
          call f.node ++
          mov ~%rax ~%r10
+     else if fun_ana.is_empty then
+       nop
      else
+       begin match !compiler_modes.inline, fun_ana.is_rec with
+       | true, true (* on inline pas une fonction recursive *)
+       | false, _ ->
             let size_ret = round8 (size_of tret) in
             let arg_size, arg_code =
 	      List.fold_left (fun (a_size, a_code) e ->
@@ -269,8 +272,13 @@ and compile_expr_reg env e =
 	      call f.node ++
 	      addq ~$arg_size ~%rsp ++
               if (tret <> Tvoid) then popq ~%r10 else nop
+       | true, false -> let f, b = Hashtbl.find inline_fun f.node in
+             let _, b = f b in
+                 comment "f inline" ++ b
+
+       end
   | Esizeof t -> failwith "sizeof TODO"
-(*|_ -> compile_lvalue_reg env e*)
+  |_ -> compile_lvalue_reg env e
 
 and compile_lvalue_reg env e =
   match e.node with
@@ -391,8 +399,7 @@ let compile_decl (atext, adata) d =
        space n
   | Dfun (_, _, _, None, _) -> atext, adata
   | Dfun (tret, f, params, Some body, fun_ana) ->
-     if fun_ana.is_empty then print_string "Empty function";
-     if fun_ana.is_rec then print_string "Recursive function";
+
      let last_offset, env =
        List.fold_left (fun (aoffset, aenv) (t, x) ->
            let aenv = Env.add x.node aoffset aenv in
@@ -402,6 +409,7 @@ let compile_decl (atext, adata) d =
      in
      let ret_offset = last_offset + round8 (size_of tret) in
      let lab_fin = f.node ^ "_fin" in
+     Hashtbl.add inline_fun f.node (compile_block lab_fin (-8) env, body);
      let max_rbp_offset, body_code = compile_block lab_fin (-8) env body in
      (* max_rbp_offset est négatif *)
      let code =

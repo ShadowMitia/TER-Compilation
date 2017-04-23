@@ -6,13 +6,15 @@ let mk_compiler_param () = {
     inline = false;
   }
 
-type (*('is_rec, 'is_empty)*) fun_analyse = {
+type fun_analyse = {
     mutable is_empty : bool;
     mutable is_rec : bool;
+    mutable is_extern : bool;
   }
 
 
-let mk_fun_analysis () = {
+let mk_fun_analysis ext = {
     is_empty = false;
-    is_rec = false
+    is_rec = false;
+    is_extern = ext;
   }

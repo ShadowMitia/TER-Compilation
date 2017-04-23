@@ -7,7 +7,7 @@ let global_env = Hashtbl.create 17
 let struct_env = Hashtbl.create 17
 let fun_env = Hashtbl.create 17
 
-let cur_analyse_fun = ref ("",  mk_fun_analysis())
+let cur_analyse_fun = ref ("",  mk_fun_analysis false)
 
 
 let mk_node t e = { info = t; node = e }
@@ -103,7 +103,7 @@ let rec type_bf t =
 
 let add_global_env tab key v =
   if Hashtbl.mem tab key.node then
-    error key.info ("Redéfinition de la structure " ^ key.node)
+    error key.info ("Redéfinition de " ^ key.node)
   else begin
       Hashtbl.add tab key.node v;
     end
@@ -136,50 +136,50 @@ let rec type_expr env e =
        let te0 = type_expr env e0 in
        match unop with
        | Pos ->
-	         if not (arith te0.info) then
-		   error e0.info "Type invalide : '+' pas compatible avec "
-	         else
-		   mk_node te0.info (Eunop(Pos, te0))
+	  if not (arith te0.info) then
+	    error e0.info "Type invalide : '+' pas compatible avec "
+	  else
+	    mk_node te0.info (Eunop(Pos, te0))
        | Neg ->
-	         if not (arith te0.info) then
-		   error e0.info "Type invalide : '-' pas compatible avec"
-	         else
-		   mk_node te0.info (Eunop(Neg, te0))
+	  if not (arith te0.info) then
+	    error e0.info "Type invalide : '-' pas compatible avec"
+	  else
+	    mk_node te0.info (Eunop(Neg, te0))
        | Not ->
-	        if not (arith te0.info) then
-		  error e0.info "Type invalide : '!' pas compatible avec"
-	        else
-		  mk_node te0.info (Eunop(Not, te0))
+	  if not (arith te0.info) then
+	    error e0.info "Type invalide : '!' pas compatible avec"
+	  else
+	    mk_node te0.info (Eunop(Not, te0))
        | Deref ->
-                  if not (num te0.info) then
-                    error e0.info "Type invalide - '*' pas compatible avec"
-                  else
-                    mk_node te0.info (Eunop(Deref, te0))
+          if not (num te0.info) then
+            error e0.info "Type invalide - '*' pas compatible avec"
+          else
+            mk_node te0.info (Eunop(Deref, te0))
        | Addr ->
-                  if not (num te0.info) then
-                    error e0.info "Type invalide - '&'"
-                  else
-                    mk_node te0.info (Eunop(Addr, te0))
+          if not (num te0.info) then
+            error e0.info "Type invalide - '&'"
+          else
+            mk_node te0.info (Eunop(Addr, te0))
        | PreInc ->
-                   if not (num te0.info) then
-                     error e0.info "Type invalide"
-                   else
-                     mk_node te0.info (Eunop(PreInc, te0))
+          if not (num te0.info) then
+            error e0.info "Type invalide"
+          else
+            mk_node te0.info (Eunop(PreInc, te0))
        | PreDec ->
-                   if not (num te0.info) then
-                     error e0.info "Type invalide"
-                   else
-                     mk_node te0.info (Eunop(PreDec, te0))
+          if not (num te0.info) then
+            error e0.info "Type invalide"
+          else
+            mk_node te0.info (Eunop(PreDec, te0))
        | PostInc ->
-                    if not (num te0.info) then
-                      error e0.info "Type invalide"
-                    else
-                      mk_node te0.info (Eunop(PostInc, te0))
+          if not (num te0.info) then
+            error e0.info "Type invalide"
+          else
+            mk_node te0.info (Eunop(PostInc, te0))
        | PostDec ->
-                    if not (num te0.info) then
-                      error e0.info "Type invalide"
-                    else
-                      mk_node te0.info (Eunop(PostDec, te0))
+          if not (num te0.info) then
+            error e0.info "Type invalide"
+          else
+            mk_node te0.info (Eunop(PostDec, te0))
      end
   | Ebinop (e1, Dot, e2) -> type_struct_access env e1 e2
   | Ebinop (e1, Arrow, e2) -> type_struct_access env e1 e2
@@ -243,17 +243,17 @@ let rec type_expr env e =
        try
          let tret, _, args, _ = Hashtbl.find fun_env f.node in
          try
-             let new_params =
-                 if args = [] then
-                     tparams
-                 else
-                     List.map2 (fun e(t, x) ->
-                         if not (compatible e.info t) then
-                             error x.info ("Invalid type")
-                         else
-                             mk_node t (Ecast(t, e))
+           let new_params =
+             if args = [] then
+               tparams
+             else
+               List.map2 (fun e(t, x) ->
+                   if not (compatible e.info t) then
+                     error x.info ("Invalid type")
+                   else
+                     mk_node t (Ecast(t, e))
                  ) tparams args in
-             mk_node tret (Ecall(f, new_params))
+           mk_node tret (Ecall(f, new_params))
          with Invalid_argument _ -> error f.info ("Nombre d'arguments invalide pour " ^ f.node)
        with Not_found -> error f.info ("La fonction " ^ f.node ^ " n'existe pas")
      end
@@ -290,10 +290,10 @@ and type_lvalue env e =
   | _ -> error e.info "Valeur gauche attendue "
 
 and type_struct_access env s iden =
- let var_ident = begin match iden.node with
-    | Eident i -> i
-    | _ -> assert false
-    end
+  let var_ident = begin match iden.node with
+                  | Eident i -> i
+                  | _ -> assert false
+                  end
   in
   let t_struct = type_expr env s in
   match t_struct.info with
@@ -303,9 +303,9 @@ and type_struct_access env s iden =
        try
          let t, i = List.find (fun (t, i) -> i.node = var_ident.node) fields in
          mk_node t (Ebinop(t_struct, Dot, mk_node t (Eident var_ident)))
-         with Not_found -> error iden.info ("Champ invalide " ^ var_ident.node)
-        with Not_found -> error id.info ("Structure non définie " ^ id.node)
-  | _ -> error s.info ("Accès à un champ non structure")
+       with Not_found -> error iden.info ("Champ invalide " ^ var_ident.node)
+     with Not_found -> error id.info ("Structure non définie " ^ id.node)
+        | _ -> error s.info ("Accès à un champ non structure")
 
 let rec type_instr ty env i =
   match i.node with
@@ -356,7 +356,7 @@ let type_decl d =
      if not (type_bf t) then error f.info "Type de retour invalide"
      else
        begin
-	 add_global_env fun_env f (t, f, params, b = None);
+	 add_global_env fun_env f (t, f, params, fun_ana);
 	 let t_params = type_var_decl params in
 	 let t_block, fun_ana = match b with
 	   | None -> None, fun_ana
@@ -364,18 +364,16 @@ let type_decl d =
                            let env = add_env Env.empty params in
 			   let t_block = type_block t env block in
                            let _, fun_ana = !cur_analyse_fun in
-                           cur_analyse_fun := ("", mk_fun_analysis());
+                           cur_analyse_fun := ("", mk_fun_analysis false);
 			   Some t_block, fun_ana
 	 in
          begin
            match t_block with
-           | Some (vars, instrs) -> if List.length instrs = 1 then
-                         begin
-                           match (List.nth instrs 0).node with
-                           | Sskip -> print_string "Sskip"; fun_ana.is_empty <- true
-                           | _ -> ()
-                         end
-                                    else if List.length instrs = 0 then fun_ana.is_empty <- true
+           | Some (vars, instrs) ->
+              if List.for_all (fun a -> match a.node with Sskip -> true | _ -> false) instrs = true then
+                 begin print_string "empty"; fun_ana.is_empty <- true end
+              else if List.length instrs = 0 then
+                 begin print_string "empty"; fun_ana.is_empty <- true end
            | _ -> ()
          end;
 	 Dfun(t, f, t_params, t_block, fun_ana)
