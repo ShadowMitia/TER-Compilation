@@ -1,13 +1,23 @@
-# README TER
+# TER Compilation
 
-Choisir sujet + commencer rapport
+Projet réalisé par Dimitri Belopopsky et Jérémie Irr
 
-Tester que dans les fonctions (type_instr) tout les chemins de controles ont bien un return
-Type_instr doit renvoyer un argument en plus
+## Organisation
 
-Faire les todos dans le code
+Les fichiers du projet sont:
 
-Gérer les cas entier 32 bits et 64 bits dans le lexer/parser
-Gérer les cas char/string dans le lexer/parser
+- compile.ml
+- ast.ml
+- parser.mly
+- lexel.mll
+- analysis.ml
+- typing.ml
 
-Rajouter des exemples
+## Compiler le compilateur
+
+`make` pour compiler ce projet
+`make tests` pour compiler le jeu de tests se trouvant dans tests
+
+## Autre
+
+Le rapport et le sujet du projet se trouvent dans le dossier other.

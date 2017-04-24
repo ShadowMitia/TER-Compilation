@@ -1,50 +1,52 @@
 
-#SRC_PASS=$(shell find . -name "*pass.c" -printf '%f\n')
-#SRC_FAIL=$(shell find . -name "*fail.c" -printf '%f\n')
-#SRC=$(shell find -name "*.c" ! -name "*fail.c" ! -name "*pass.c" -printf '%f\n')
 SRC_ALL := $(wildcard *.c)
-SRC_EXE := $(SRC_ALL:.c=.exe)
+EXE := $(SRC_ALL:.c=.exe)
+INLINE_EXE := $(SRC_ALL:.c=.inline.exe)
+COMPILER_FLAGS =
+
+CHECKLIST  = copy_string.c  d02.c fact_rec.c itoa.c main2.c mandelbrot_d.c rec.c test01.c  test03.c d01.c fact_imp.c  gcd.c main1.c  mandelbrot.c mult.c test02.c
 
 COMPILER := ../minic
 CC := gcc
 
+# Pour garder les .s
 .SECONDARY:
 
-all: build
+all:
+	$(MAKE) test
+	$(MAKE) test-inline
 
-.PHONY: build
+test-inline: COMPILER_FLAGS += -inline
+test-inline: $(INLINE_EXE)
 
-build: $(SRC_EXE)
+.PHONY: build check clean test-inline
+
+test: $(EXE)
 
 %.s:%.c
 	@echo "Compiling" $^
-	@$(COMPILER) $^
+	$(COMPILER) $(COMPILER_FLAGS) $^
 
 %.exe:%.s
 	@echo "Generating" $@
 	$(CC) -o $@ $^
 
+
+%.inline.exe:%.s
+	@echo "Generating" $@
+	$(CC) -o $@ $^
+
+#check:
+#	@$(foreach p, $(wildcard *.exe), \
+#	echo "Testing on" $p; \
+#	./$p > $p.tmp; \
+#	diff -s $p.tmp $(basename $(basename $p)).out > /dev/null; \
+#	echo diff -s $p.tmp $(basename $(basename $p)).out > /dev/null; \
+#	$(if $(filter "1", diff -s $p.tmp $(basename $(basename $p)).out ), echo "PASSED", echo "FAILED"); \
+#	)
+
+
 clean:
 	rm -f *.s
 	rm -f *.exe
-
-# 	@echo -e "\n \n"
-# 	@echo -e "\n C \n"
-# 	@echo -e "\n \n"
-#	 @echo -e "\n[ Tests qui ne passent pas! ]\n"
-#	 @for i in $(shell find tests/ -name *fail.c); do \
-#	 	echo -n "Testing on " \"$$i\"; \
-#	 	./$(EXEC) -type-only $$i; \
-#	 	if [[ ("$$?" -ne 0 && "$$i" = *".fail."* ) \
-#	 	|| ( "$$?" -eq 0 && "$$i" = *".pass."* ) ]]; \
-#	 	then echo "	[PASSED]"; else echo "	[FAILED]"; fi \
-#	 done
-#	 @echo -e "\n[ Tests qui passent ]\n"
-#	 @for i in $(shell find tests/ -name *pass.c); do \
-#	 	echo -n "Testing on " \"$$i\"; \
-#	 	./$(EXEC) -type-only $$i; \
-#	 	if [[ ("$$?" -ne 0 && "$$i" = *".fail."* ) \
-#	 	|| ( "$$?" -eq 0 && "$$i" = *".pass."* ) ]]; \
-#	 	then echo "	[PASSED]"; else echo "	[FAILED]"; fi \
-#	 done;
-#	 @echo -e "\n[ Tests de génération de codes ]\n";
+	rm -f *.inline.exe

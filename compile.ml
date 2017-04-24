@@ -246,7 +246,7 @@ and compile_expr_reg env e =
      end
   | Ecall (f, params) ->
      let tret, _, _, fun_ana = Hashtbl.find fun_env f.node in
-     if fun_ana.is_extern then
+     if fun_ana.is_extern || f.node = "main" then
        let n_double, arg_code =
          assign_regs env params int_registers double_registers (0, nop)
        in
@@ -399,7 +399,6 @@ let compile_decl (atext, adata) d =
        space n
   | Dfun (_, _, _, None, _) -> atext, adata
   | Dfun (tret, f, params, Some body, fun_ana) ->
-
      let last_offset, env =
        List.fold_left (fun (aoffset, aenv) (t, x) ->
            let aenv = Env.add x.node aoffset aenv in

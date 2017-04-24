@@ -116,6 +116,7 @@ declarations:
    | STRUCT i=identifier LBRACKET decl_vars_list=list(terminated(variable_declaration, SEMI)) RBRACKET SEMI { Dstruct(i, decl_vars_list)  }
    (* Function declarations *)
    | fun_type=c_type fun_identifier=c_variable LPAR fun_args=separated_list(COMMA, variable_declaration) RPAR fun_block=block {  let t, i = unvar fun_type fun_identifier in Dfun(t, i, fun_args, Some fun_block, mk_fun_analysis false)  }
+
    | fun_type=c_type fun_identifier=c_variable LPAR fun_args=separated_list(COMMA, variable_declaration) RPAR SEMI {  let t, i = unvar fun_type fun_identifier in Dfun(t, i, fun_args, None, mk_fun_analysis false)  }
    (* Extern declarations *)
    | EXTERN fun_type=c_type fun_identifier=c_variable LPAR fun_args=separated_list(COMMA, variable_declaration) RPAR SEMI {  let t, i = unvar fun_type fun_identifier in Dfun(t, i, fun_args, None, mk_fun_analysis true)  }
